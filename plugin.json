@@ -1,0 +1,22 @@
+{
+  "id": "neodex.beffroi",
+  "name": "Beffroi",
+  "version": "1.0.0",
+  "author": "NDesumeur",
+  "description": "Jeu de saut : monte les étages d'un clocher en courant et en sautant. Plus tu cours vite, plus tu sautes haut, et les murs te renvoient l'élan. Dès le 5e étage, le clocher défile de plus en plus vite : ne te laisse pas rattraper. Combos sur les sauts de plusieurs étages, poutres de bois, de pierre puis de cuivre. Score, étages et record.",
+  "icon": "icon.png",
+  "entry": "index.js",
+  "view": "beffroi",
+  "neobase": ">=4.0.0",
+  "type": "app",
+  "category": "Jeux",
+  "syncMode": "progression",
+  "syncInfo": "Record.",
+  "mobile": false,
+  "system": false,
+  "dependencies": {},
+  "sdk": "2.1.0",
+  "permissions": [
+    "storage"
+  ]
+}
