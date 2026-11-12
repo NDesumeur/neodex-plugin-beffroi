@@ -1,0 +1,9 @@
+{
+  "pluginId": "neodex.beffroi",
+  "repo": "NDesumeur/neodex-plugin-beffroi",
+  "version": "1.0.0",
+  "sha256": "a531ee4ebb68df69eeb24e876655a3c086263fd23792fcd40c4a8b441daa923e",
+  "approvedAt": "2026-11-12T12:24:43.131Z",
+  "neobase": ">=4.0.0",
+  "signature": "g739qqOZ5/GKEQZsHgTbChkUWjTJSHGOAuSKwULt6DgG+Zh9gncRKwzFsADsb1QGr+PGe0npSs5aGns/4P+nCg=="
+}
