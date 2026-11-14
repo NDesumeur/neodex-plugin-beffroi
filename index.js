@@ -11,7 +11,7 @@ const HTML = `<div class="appWrap wide">
 </div>`;
 const CSS = `.gMain{display:flex;gap:22px;align-items:flex-start;flex-wrap:wrap}
 .gameBox{display:grid;place-items:center;padding:10px;background:#05010b;flex:0 0 auto;position:relative}
-.gameBox canvas{height:min(72vh,800px);width:auto;aspect-ratio:240/320;image-rendering:pixelated;cursor:var(--cp,pointer);touch-action:none}
+.gameBox canvas{height:min(800px,max(300px,calc(100vh - 210px)));width:auto;aspect-ratio:240/320;image-rendering:pixelated;cursor:var(--cp,pointer);touch-action:none}
 .gSide{display:flex;flex-direction:column;gap:14px;flex:1;min-width:250px;max-width:420px}
 .gSide .sysCard{display:flex;flex-direction:column}
 .gStats{display:grid;grid-template-columns:1fr auto;gap:4px 14px}
