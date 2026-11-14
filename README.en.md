@@ -6,23 +6,36 @@ A pixel art jumping game: a little bell ringer climbs the floors of a bell tower
 
 ## Controls
 
-- **← →** (or **A D**, **Q D**): run.
-- **Space**, **↑** or **W**: jump.
+- **← →** (or **Q D**, **A D**): run.
+- **Space**, **↑** or **Z**: jump. **Hold the key** to go higher, let go quickly for a small jump.
+- **Gamepad**: stick or d-pad to run, **A**, **B** or up to jump, **Start** to begin or pause.
 - **Mouse** or **finger**: press on the left or right of the game to run, in the middle to jump.
-- **P** or **Esc**: pause.
+- **P** or **Esc**: pause. The **Fullscreen** button is next to New game.
 
 ## How it works
 
-- **The faster you run, the higher you jump.** The gauge at the top shows your speed: at full speed, a jump clears 3 floors.
-- **Walls** bounce you back without slowing you: run into a wall to head the other way at full speed.
-- **Beams** can be crossed from below: you land on them when falling. They get shorter as you climb, and change from wood to stone then copper every 25 floors. A sign marks every tenth floor.
-- From **floor 5**, the tower scrolls by itself, a bit faster every 30 seconds. If it catches you from below, you lose.
-- Each new floor gives **10 points**.
-- **Combos**: chain jumps of at least 2 floors. The combo stops on a small jump or after 3 seconds, and scores the square of the floors gained (8 floors in a combo = 64 points), from 2 jumps on.
+- **The faster you run, the higher you jump.** The gauge at the top shows your speed: at full speed, a jump clears 3 floors, with a somersault.
+- The **walls** send you back without slowing you down: run into a wall to head the other way at full speed.
+- The jump is forgiving: it goes off even if you press a little before landing, or just after leaving a beam.
+- **Beams** can be crossed from below and get shorter as you climb. From the 12th floor, some **move**, others are **cracked** and fall soon after you land; in the clock, some **slide**.
+- The first floors show the moves on the wall. On the **5th floor**, a countdown, then the tower scrolls by itself, a little faster every 30 seconds. If it catches you from below, you lose.
+
+## The bell tower
+
+You go through **the cellars** (torches), **the timber frame** (lanterns), **the bell room**, **the clock** (gears, clock face), **the stained glass**, then **the top**, open to the sky, under the stars and the moon.
+
+- **Bells** throw you upwards when you touch them in the air (+15 points).
+- Music **notes** are worth 25 points each.
+- **Birds** (pigeons, then bats) cut your momentum and your combo.
+
+## Points
+
+- Each new floor is worth **10 points**.
+- **Combos**: chain jumps of at least 2 floors. The combo stops on a small jump or after 3 seconds, and is worth the square of the floors gained (8 floors in a combo = 64 points), from 2 jumps.
 
 ## Stats
 
-The Records panel keeps your **best score**, the number of **games**, the total **floors climbed** and the number of **combos**.
+The Records panel keeps your **best score**, your **highest floor**, the number of **games**, and the totals of **floors climbed**, **combos**, **notes** and **bells rung**.
 
 ## Data and sync
 

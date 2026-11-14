@@ -1,21 +1,24 @@
 // Beffroi : on monte les étages d'un clocher en courant et en sautant, plus haut quand on court vite, avant que le clocher ne nous rattrape.
 // Jeu NeoDex en pixel art dessiné à la main (police bitmap, cadres et boutons en pixels). Il tourne dans le bac à sable de NeoDex.
 const HTML = `<div class="appWrap wide">
-  <div class="agHead"><span class="label">Beffroi</span><span class="hint">← → ou QD pour courir · Espace ou ↑ pour sauter · P : pause</span></div>
-  <div class="gMain"><div class="gameBox"><canvas id="bfCanvas" width="144" height="192" role="img" aria-label="Beffroi"></canvas></div>
+  <div class="agHead"><span class="label">Beffroi</span><span class="hint">← → ou QD pour courir · Espace ou ↑ pour sauter (garde la touche pour monter plus haut) · P : pause · manette</span></div>
+  <div class="gMain"><div class="gameBox"><canvas id="bfCanvas" width="240" height="320" role="img" aria-label="Beffroi"></canvas></div>
     <div class="gSide">
       <div class="sysCard"><b>RECORDS</b><div class="gStats" id="bfStats"></div></div>
-      <div class="row"><button class="btn main" id="bfNew">NOUVELLE PARTIE</button></div>
-      <div class="hint">Plus tu cours vite, plus tu sautes haut : la jauge en haut montre ta vitesse. Les murs te renvoient sans freiner, profites-en pour prendre de l'élan. Dès le 5e étage, le clocher défile tout seul, de plus en plus vite : s'il te rattrape, c'est perdu. Enchaîne les sauts de 2 étages ou plus pour un combo : il rapporte le carré des étages gagnés.</div>
+      <div class="row"><button class="btn main" id="bfNew">NOUVELLE PARTIE</button><button class="btn" id="bfFs">PLEIN ÉCRAN</button></div>
+      <div class="hint">Plus tu cours vite, plus tu sautes haut : la jauge en haut montre ta vitesse. Garde la touche de saut pour monter plus haut, lâche-la pour un petit saut. Les murs te renvoient sans freiner. Les cloches te relancent vers le haut, les notes rapportent des points, les oiseaux coupent ton élan. Certaines poutres bougent, cassent ou glissent. Dès le 5e étage, après un compte à rebours, le clocher défile tout seul, de plus en plus vite : s'il te rattrape, c'est perdu. Enchaîne les sauts de 2 étages ou plus pour un combo : il rapporte le carré des étages gagnés.</div>
     </div></div>
 </div>`;
 const CSS = `.gMain{display:flex;gap:22px;align-items:flex-start;flex-wrap:wrap}
 .gameBox{display:grid;place-items:center;padding:10px;background:#05010b;flex:0 0 auto;position:relative}
-.gameBox canvas{height:min(72vh,768px);width:auto;aspect-ratio:144/192;image-rendering:pixelated;cursor:var(--cp,pointer);touch-action:none}
+.gameBox canvas{height:min(72vh,800px);width:auto;aspect-ratio:240/320;image-rendering:pixelated;cursor:var(--cp,pointer);touch-action:none}
 .gSide{display:flex;flex-direction:column;gap:14px;flex:1;min-width:250px;max-width:420px}
 .gSide .sysCard{display:flex;flex-direction:column}
 .gStats{display:grid;grid-template-columns:1fr auto;gap:4px 14px}
-.gStats b{text-align:right}`;
+.gStats b{text-align:right}
+.gameBox:fullscreen{padding:0;display:grid;place-items:center}
+.gameBox:fullscreen canvas{height:100vh;width:auto}
+@media(max-width:620px){.gameBox canvas{height:auto;width:100%}}`;
 /* ---------- l'habillage pixel art, dessiné à la main : police bitmap (accents compris), cadres, boutons, icônes ----------
    Tout est en pixels pleins, agrandis par 2 sans lissage : aucun dégradé, aucune ombre floue. */
 const PXK = (() => {
@@ -322,54 +325,63 @@ function sprite(g, rows, x, y, pal) { rows.forEach((r, j) => { for (let i = 0; i
 const seeded = s => () => { s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 const pxFont = (g, text, x, y, color, size = 8, align = 'left') => { const s = PXK.scale(size); PXK.fill(g, text, x + s, y + s, '#05010b', s, align); PXK.fill(g, text, x, y, color, s, align); };
 
-/* ---------- Beffroi : on monte les étages d'un clocher en courant et en sautant ; plus on court vite, plus on saute haut.
-   Les murs renvoient l'élan. Après le 5e étage, le clocher se met à défiler : il ne faut pas rester en bas. 32 px = 1 étage ---------- */
-const BF = {W: 144, H: 192, WALL: 12, FL: 32, PW: 8, PH: 12, G: .22, AX: .2, VMAX: 3.2, J0: 4.3, JV: .8};
+/* ---------- Beffroi : on monte les étages d'un clocher en courant et en sautant ; plus on court vite, plus on saute haut, et plus longtemps
+   on garde la touche, plus le saut monte. Les murs renvoient l'élan. Le clocher change en montant (caves, charpente, cloches, horloge,
+   vitraux, sommet) ; cloches pour rebondir, oiseaux qui gênent, poutres qui bougent, cassent ou glissent, notes à ramasser.
+   Après le 5e étage et un compte à rebours, le clocher se met à défiler : il ne faut pas rester en bas. 48 px = 1 étage ---------- */
+const BF = {W: 240, H: 320, WALL: 16, FL: 48, PW: 12, PH: 18, G: .33, AX: .3, VMAX: 4.8, J0: 6.45, JV: .8, VY: 10.5, BELL: 1.45};
 BF.L = BF.WALL; BF.R = BF.W - BF.WALL;
-const bfs = gstore('beffroi', {games: 0, floors: 0, combos: 0});
+const bfs = gstore('beffroi', {games: 0, floors: 0, combos: 0}); bfs.notes ??= 0; bfs.bells ??= 0; bfs.top ??= 0;
 let bf = null, bfac = null;
-// le sonneur : un petit bonhomme en capuchon, de profil vers la droite (miroir pour la gauche)
-const BF_PAL = {k: '#1a1018', h: '#7a3a2a', H: '#a85a3a', s: '#ffd0a8', e: '#1a1018', c: '#3a6ac8', C: '#24448a', b: '#5a3a2a', w: '#f0e8d8'};
-const BF_ART = {
-  idle: ['..kkkk..', '.khhhHk.', 'khhhhhHk', 'khhssssk', 'khsseske', '.ksssskk', '..kcck..', '.kccCck.', '.kcCCck.', '..kCCk..', '..kbkbk.', '..kk.kk.'],
-  run1: ['..kkkk..', '.khhhHk.', 'khhhhhHk', 'khhssssk', 'khsseske', '.ksssskk', '..kcck..', '.kccCck.', 'kkcCCckk', '..kCCk..', '.kbk.kbk', '.kk...kk'],
-  run2: ['........', '..kkkk..', '.khhhHk.', 'khhhhhHk', 'khhssssk', 'khsseske', '.ksssskk', '..kccck.', '.kcCCck.', '..kCCk..', '..kbbk..', '..kkkk..'],
-  jump: ['..kkkk..', '.khhhHk.', 'khhhhhHk', 'khhssssk', 'khsseske', 'kksssskk', 'kcckcckk', '..kCCk..', '..kCCk..', '.kbk.kb.', '.kk..kk.', '........'],
-};
-const bfArt = (rows, flip) => { const c = el('canvas'); c.width = BF.PW; c.height = BF.PH; sprite(c.getContext('2d'), flip ? rows.map(r => [...r].reverse().join('')) : rows, 0, 0, BF_PAL); return c; };
-const BF_SPR = Object.fromEntries(Object.entries(BF_ART).map(([k, rows]) => [k, [bfArt(rows, false), bfArt(rows, true)]]));
-// trois matières d'étage, qui changent tous les 25 étages : bois, pierre, cuivre
+const bfHash = (a, b = 0) => { let h = Math.imul(a + 374761393, 668265263) ^ Math.imul(b + 1274126177, 2246822519); h = Math.imul(h ^ h >>> 13, 1274126177); return (h ^ h >>> 16) >>> 0; };
+const bfMix = (a, b, k) => { const p = h => [1, 3, 5].map(i => parseInt(h.substr(i, 2), 16)), x = p(a), y = p(b); return '#' + x.map((v, i) => Math.round(v + (y[i] - v) * k).toString(16).padStart(2, '0')).join(''); };
+// les zones du clocher, de la cave au sommet à ciel ouvert (mat : matière des poutres)
+const BF_Z = [
+  {from: 0, name: 'LES CAVES', bg: '#2a2420', br: '#1a1612', hl: '#3a322a', wall: '#5a5048', wl: '#7a6e62', wd: '#2a241e', mat: 1},
+  {from: 10, name: 'LA CHARPENTE', bg: '#3a2618', br: '#24160c', hl: '#4a321e', wall: '#6a4a32', wl: '#8a6a4a', wd: '#3a2414', mat: 0},
+  {from: 25, name: 'LA SALLE DES CLOCHES', bg: '#2a1a20', br: '#1a0e14', hl: '#3a242a', wall: '#5a3a3a', wl: '#8a6058', wd: '#2a1a1e', mat: 0},
+  {from: 50, name: "L'HORLOGE", bg: '#1c1c2a', br: '#12121c', hl: '#2a2a3a', wall: '#4a4a5a', wl: '#6a6a80', wd: '#24242e', mat: 2},
+  {from: 75, name: 'LES VITRAUX', bg: '#201a30', br: '#140e20', hl: '#2e2640', wall: '#5a5070', wl: '#7a7090', wd: '#2a2438', mat: 1},
+  {from: 100, name: 'LE SOMMET', bg: '#2a3a6a', br: '#2a3a6a', hl: '#2a3a6a', wall: '#8a8090', wl: '#b0a8b8', wd: '#3a3440', mat: 1, sky: true},
+];
+const bfZi = n => { let i = 0; while (i + 1 < BF_Z.length && n >= BF_Z[i + 1].from) i++; return i; };
 const BF_MAT = [['#8a5a32', '#c8884a', '#4a2a18'], ['#6a6470', '#a8a0b0', '#34303a'], ['#a8682a', '#ffc85a', '#5a3010']];
-// les murs du clocher : briques, et le fond : briques sombres percées de fenêtres en ogive (ciel étoilé)
-const BF_BRICK = (() => { const c = el('canvas'); c.width = BF.WALL; c.height = 32; const g = c.getContext('2d');
-  px(g, '#5a3a3a', 0, 0, BF.WALL, 32);
-  for (let r = 0; r < 4; r++) { const y = r * 8, o = r % 2 ? 6 : 0; px(g, '#2a1a1e', 0, y + 7, BF.WALL, 1); for (let x = o; x < BF.WALL + 6; x += 12) { px(g, '#2a1a1e', x - 1, y, 1, 7); px(g, '#7a5048', x, y, 5, 1); } }
-  return c; })();
-const BF_BACK = (() => { const w = BF.W - 2 * BF.WALL, c = el('canvas'); c.width = w; c.height = 160; const g = c.getContext('2d');
-  px(g, '#24161c', 0, 0, w, 160);
-  for (let r = 0; r < 20; r++) { const y = r * 8, o = r % 2 ? 8 : 0; px(g, '#1a0e14', 0, y + 7, w, 1); for (let x = o; x < w; x += 16) px(g, '#1a0e14', x, y, 1, 7); }
-  // une fenêtre en ogive, avec le ciel et deux étoiles
-  const wx = 46, wy = 40;
-  for (let y = 0; y < 44; y++) { const half = y < 12 ? Math.round(Math.sqrt(Math.max(0, 144 - (12 - y) ** 2)) * .85) : 10; px(g, '#4a2e30', wx + 14 - half - 2, wy + y, half * 2 + 4, 1); px(g, '#141838', wx + 14 - half, wy + y, half * 2, 1); }
-  px(g, '#4a2e30', wx + 13, wy + 4, 2, 40); px(g, '#4a2e30', wx + 4, wy + 22, 20, 2);
-  for (const [x, y] of [[wx + 7, wy + 10], [wx + 19, wy + 30], [wx + 9, wy + 34]]) px(g, '#f0e8d8', x, y);
-  px(g, '#3a242a', wx + 2, wy + 44, 24, 3);
-  return c; })();
 const bfFloorY = n => -n * BF.FL;
+// le fond d'un étage (la largeur entre les murs, la hauteur d'un étage) et le mur, dessinés une fois par zone
+const bfTiles = {};
+function bfTile(zi) {
+  if (bfTiles[zi]) return bfTiles[zi];
+  const z = BF_Z[zi], w = BF.R - BF.L, mk = (cw) => { const c = el('canvas'); c.width = cw; c.height = BF.FL; return c; }, back = mk(w), wall = mk(BF.WALL), g = back.getContext('2d'), q = wall.getContext('2d');
+  px(g, z.bg, 0, 0, w, BF.FL);
+  if (!z.sky) for (let r = 0; r < 6; r++) { const y = r * 8, o = r % 2 ? 8 : 0; px(g, z.br, 0, y + 7, w, 1); px(g, z.hl, 0, y, w, 1); for (let x = o; x < w; x += 16) px(g, z.br, x, y, 1, 7); }
+  if (zi === 1) for (let k = 0; k < BF.FL; k++) { px(g, '#24160c', 30 + k - 1, k, 8, 1); px(g, '#5a3a22', 30 + k, k, 6, 1); px(g, '#24160c', w - 38 - k, k, 8, 1); px(g, '#5a3a22', w - 37 - k, k, 6, 1); }
+  if (zi === 2) for (const x of [26, w - 28]) { px(g, '#6a4a32', x, 0, 2, BF.FL); for (let y = 2; y < BF.FL; y += 4) px(g, '#8a6a4a', x, y, 1, 2); }
+  px(q, z.wall, 0, 0, BF.WALL, BF.FL);
+  for (let r = 0; r < 6; r++) { const y = r * 8, o = r % 2 ? 8 : 0; px(q, z.wd, 0, y + 7, BF.WALL, 1); for (let x = o; x < BF.WALL + 8; x += 16) { px(q, z.wd, x - 1, y, 1, 7); px(q, z.wl, x, y, 7, 1); } }
+  return bfTiles[zi] = {back, wall};
+}
 // une nouvelle partie garde le même objet : la boucle du jeu (gameLoop) continue de tourner dessus
 const renew = (old, o) => { if (!old) return o; for (const k of Object.keys(old)) if (k !== 'raf') delete old[k]; return Object.assign(old, o); };
 function bfNew() {
-  const g = bf?.g;
-  bf = renew(bf, {g, mode: 'ready', tick: 0, seen: 0, x: BF.W / 2 - BF.PW / 2, y: 0, vx: 0, vy: 0, ground: 0, face: 0, keys: new Set(), floors: [], cam: -BF.H + 40, scroll: 0, top: 0,
-    score: 0, combo: 0, comboN: 0, comboT: 0, last: 0, best: 0, pop: null, dead: 0, record: false, rnd: seeded(Date.now() % 1e9), jumpHeld: false, dust: []});
-  bfGen(60); bfInfo();
+  const g = bf?.g, hc = bf?.hc;
+  bf = renew(bf, {g, hc, mode: 'ready', tick: 0, seen: 0, x: BF.W / 2 - BF.PW / 2, y: 0, vx: 0, vy: 0, ground: 0, face: 0, keys: new Set(), floors: [], bells: [], notes: [], birds: [], cam: -BF.H + 60, scroll: 0,
+    score: 0, combo: 0, comboN: 0, comboT: 0, last: 0, best: 0, pop: null, banner: null, dead: 0, record: false, rnd: seeded(Date.now() % 1e9), dust: [], trail: [],
+    coy: 0, buf: 0, jPrev: false, rising: false, hurt: 0, spin: 0, count: 0, started: false, birdT: 300, zi: 0, got: 0, rang: 0});
+  bf.ground = null; bfGen(60); bf.ground = bf.floors[0]; bfInfo();
 }
-// les étages : le 0 et les 5 premiers prennent toute la largeur ; ensuite des poutres de plus en plus courtes
+// les étages : le 0, les 5 premiers, chaque début de zone et tous les 50 prennent toute la largeur ; ensuite des poutres de plus en plus courtes,
+// dès le 12e certaines bougent, cassent ou glissent (à partir de l'horloge) ; des cloches (surtout dans la salle des cloches) et des notes
 function bfGen(upTo) {
   for (let n = bf.floors.length; n <= upTo; n++) {
-    if (n < 5 || n % 50 === 0) { bf.floors.push({n, x: BF.L, w: BF.R - BF.L}); continue; }
-    const w = Math.max(28, Math.round(80 - Math.min(n, 300) / 6 - bf.rnd() * 22)), x = BF.L + Math.round(bf.rnd() * (BF.R - BF.L - w));
-    bf.floors.push({n, x, w});
+    const R = bf.rnd, zi = bfZi(n);
+    if (n < 5 || n % 50 === 0 || BF_Z.some(z => z.from === n)) { bf.floors.push({n, x: BF.L, w: BF.R - BF.L, ox: BF.L, type: '', amp: 0}); continue; }
+    const w = Math.max(42, Math.round(120 - Math.min(n, 300) / 4 - R() * 33)), r = R();
+    let type = '';
+    if (n >= 12) { const pm = Math.min(.25, .06 + (n - 12) / 200), pb = Math.min(.2, .04 + (n - 12) / 250); type = r < pm ? 'move' : r < pm + pb ? 'break' : zi >= 3 && r < pm + pb + .2 ? 'slip' : ''; }
+    const amp = type === 'move' ? Math.max(0, Math.min(40, (BF.R - BF.L - w) / 2 - 2)) : 0, ox = BF.L + amp + Math.round(R() * (BF.R - BF.L - w - 2 * amp));
+    bf.floors.push({n, x: ox, w, ox, type, amp, sp: .02 + R() * .02, ph: R() * 6.28});
+    if (n >= 8 && R() < (zi === 2 ? .4 : .08)) bf.bells.push({x: BF.L + 16 + Math.round(R() * (BF.R - BF.L - 32)), y: bfFloorY(n) - 36, cd: 0, sw: 0, n});
+    if (n >= 3 && R() < .3) bf.notes.push({x: ox + w / 2, y: bfFloorY(n) - 16, got: false, n});
   }
 }
 function bfBeep(f, d, type = 'square', slide = 0, vol = .04) { try { bfac ??= new AudioContext(); const o = bfac.createOscillator(), g = bfac.createGain(), t = bfac.currentTime; o.type = type; o.frequency.setValueAtTime(f, t); if (slide) o.frequency.exponentialRampToValueAtTime(slide, t + d); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.0001, t + d); o.connect(g).connect(bfac.destination); o.start(t); o.stop(t + d); } catch {} }
@@ -381,83 +393,244 @@ function bfComboEnd() {
 function bfLand(f) {
   const gained = f.n - bf.last;
   if (gained >= 2) { bf.combo += gained; bf.comboN++; bf.comboT = 180; } else if (gained !== 0 || bf.comboT <= 0) bfComboEnd();
-  bf.last = f.n; bf.ground = f;
-  if (f.n > bf.best) { bf.score += (f.n - bf.best) * 10; bf.best = f.n; }
-  for (let i = 0; i < 4; i++) bf.dust.push({x: bf.x + 2 + i * 2, y: bf.y, t: 10});
+  bf.last = f.n; bf.ground = f; bf.spin = 0; bf.rising = false;
+  if (f.type === 'break' && !f.br) f.br = 36;
+  if (f.n > bf.best) {
+    bf.score += (f.n - bf.best) * 10; bf.best = f.n;
+    const zi = bfZi(f.n); if (zi > bf.zi) { bf.zi = zi; bf.banner = {text: BF_Z[zi].name, t: 150}; bfBeep(523, .15, 'triangle'); setTimeout(() => bfBeep(784, .3, 'triangle'), 120); }
+    if (f.n >= 5 && !bf.started) { bf.started = true; bf.count = 180; }
+  }
+  for (let i = 0; i < 5; i++) bf.dust.push({x: bf.x + 1 + i * 2.5, y: bf.y, t: 12, c: '#e8d8c8'});
   bfBeep(gained >= 2 ? 520 : 300, .05, 'triangle');
 }
 function bfDie() {
   if (bf.mode !== 'play') return;
   bfComboEnd(); bf.mode = 'over'; bf.dead = 0; bf.keys.clear();
-  bfs.games++; bfs.floors += bf.best; bf.record = best('beffroi', bf.score); saveGames(); bfInfo();
+  bfs.games++; bfs.floors += bf.best; bfs.top = Math.max(bfs.top, bf.best); bf.record = best('beffroi', bf.score); saveGames(); bfInfo();
   bfBeep(400, .7, 'triangle', 60, .07);
 }
 function bfJump() {
-  if (bf.mode !== 'play' || !bf.ground) return;
-  bf.vy = -(BF.J0 + Math.abs(bf.vx) * BF.JV); bf.ground = null;
-  bfBeep(220 + Math.abs(bf.vx) * 80, .12, 'square', 520 + Math.abs(bf.vx) * 120, .03);
+  if (bf.mode !== 'play' || !(bf.ground || bf.coy > 0)) return;
+  bf.vy = -(BF.J0 + Math.abs(bf.vx) * BF.JV); bf.ground = null; bf.coy = 0; bf.buf = 0; bf.rising = true;
+  bf.spin = Math.abs(bf.vx) > BF.VMAX * .92 ? 1 : 0;  // à pleine vitesse : un salto
+  bfBeep(220 + Math.abs(bf.vx) * 55, .12, 'square', 520 + Math.abs(bf.vx) * 80, .03);
 }
 function bfUpdate() {
   if (bf.mode === 'over') { bf.dead++; return; }
   if (bf.mode !== 'play') return;
-  const k = bf.keys, on = (...n) => n.some(x => k.has(x)), dir = (on('ArrowRight', 'd') ? 1 : 0) - (on('ArrowLeft', 'q', 'a') ? 1 : 0);
-  // la course : on accélère vers la touche, on freine au sol sans touche
+  const k = bf.keys, on = (...n) => n.some(x => k.has(x)), pad = bf.pad || {};
+  const dir = Math.max(-1, Math.min(1, (on('ArrowRight', 'd') ? 1 : 0) - (on('ArrowLeft', 'q', 'a') ? 1 : 0) + (pad.x || 0))), jk = on(' ', 'ArrowUp', 'z', 'w') || !!pad.j;
+  // les poutres qui bougent emportent le sonneur ; celles qui cassent tombent
+  for (const f of bf.floors) {
+    if (f.type === 'move') { const nx = f.ox + Math.sin(bf.tick * f.sp + f.ph) * f.amp; if (bf.ground === f) bf.x += nx - f.x; f.x = nx; }
+    if (f.br > 0 && --f.br === 0) { f.gone = 1; if (bf.ground === f) { bf.ground = null; bf.coy = 6; } bfBeep(120, .25, 'sawtooth', 50, .04); }
+    if (f.gone) f.gone += .3 + f.gone * .05;
+  }
+  // la course : on accélère vers la touche, on freine au sol sans touche (presque pas sur une poutre qui glisse)
   if (dir) { bf.vx = Math.max(-BF.VMAX, Math.min(BF.VMAX, bf.vx + dir * BF.AX)); bf.face = dir < 0 ? 1 : 0; }
-  else if (bf.ground) bf.vx *= .82;
+  else if (bf.ground) bf.vx *= bf.ground.type === 'slip' ? .985 : .82;
   if (Math.abs(bf.vx) < .05) bf.vx = 0;
   bf.x += bf.vx;
   if (bf.x < BF.L) { bf.x = BF.L; bf.vx = Math.abs(bf.vx) * .9; bf.face = 0; if (!bf.ground) bfBeep(160, .04, 'square', 0, .02); }  // le mur renvoie l'élan
   if (bf.x > BF.R - BF.PW) { bf.x = BF.R - BF.PW; bf.vx = -Math.abs(bf.vx) * .9; bf.face = 1; if (!bf.ground) bfBeep(160, .04, 'square', 0, .02); }
-  if (on(' ', 'ArrowUp', 'z', 'w') && bf.ground) bfJump();
+  // le saut : gardé en mémoire un instant si on appuie trop tôt, possible encore un instant après avoir quitté une poutre ; lâcher la touche le raccourcit
+  if (jk && !bf.jPrev) bf.buf = 8; bf.jPrev = jk;
+  if ((bf.buf > 0 || (jk && bf.ground)) && (bf.ground || bf.coy > 0)) bfJump();
+  if (bf.buf > 0) bf.buf--;
+  if (bf.rising && !jk && bf.vy < -2) { bf.vy *= .5; bf.rising = false; }
   // au sol : on tombe si on sort de la poutre ; en l'air : la gravité, et on se pose seulement en descendant (on traverse par en dessous)
-  if (bf.ground && (bf.x + BF.PW - 2 < bf.ground.x || bf.x + 2 > bf.ground.x + bf.ground.w)) bf.ground = null;
+  if (bf.ground && (bf.x + BF.PW - 3 < bf.ground.x || bf.x + 3 > bf.ground.x + bf.ground.w)) { bf.ground = null; bf.coy = 6; }
   if (!bf.ground) {
-    const prev = bf.y; bf.vy = Math.min(7, bf.vy + BF.G); bf.y += bf.vy;
-    if (bf.vy > 0) for (const f of bf.floors) { const fy = bfFloorY(f.n); if (prev <= fy && bf.y >= fy && bf.x + BF.PW - 2 >= f.x && bf.x + 2 <= f.x + f.w) { bf.y = fy; bf.vy = 0; bfLand(f); break; } }
+    if (bf.coy > 0) bf.coy--;
+    const prev = bf.y; bf.vy = Math.min(BF.VY, bf.vy + BF.G); bf.y += bf.vy; if (bf.vy >= 0) bf.rising = false;
+    if (bf.vy > 0) for (const f of bf.floors) { if (f.gone) continue; const fy = bfFloorY(f.n); if (prev <= fy && bf.y >= fy && bf.x + BF.PW - 3 >= f.x && bf.x + 3 <= f.x + f.w) { bf.y = fy; bf.vy = 0; bfLand(f); break; } }
   }
+  if (bf.spin) bf.spin++;
+  // les cloches : on rebondit dessus en l'air ; les notes : on les ramasse
+  const hx = bf.x + BF.PW / 2, hy = bf.y - BF.PH / 2;
+  for (const b of bf.bells) {
+    if (b.cd) b.cd--; b.sw *= .985;
+    if (!bf.ground && !b.cd && Math.abs(hx - b.x) < 12 && hy > b.y - 6 && hy < b.y + 26) {
+      b.cd = 40; b.sw = bf.vx >= 0 ? .5 : -.5; bf.vy = -BF.J0 * BF.BELL; bf.rising = false; bf.spin = 1; bfs.bells++; bf.rang++; bf.score += 15;
+      bf.pop = {text: 'DONG ! +15', t: 60}; bfBeep(660, .9, 'triangle', 0, .06); bfBeep(990, .6, 'sine', 0, .03);
+    }
+  }
+  for (const nt of bf.notes) if (!nt.got && Math.abs(hx - nt.x) < 11 && Math.abs(hy - nt.y) < 15) {
+    nt.got = true; bf.got++; bfs.notes++; bf.score += 25; bfBeep([523, 587, 659, 784, 880, 1047][bf.got % 6], .18, 'triangle', 0, .05);
+    for (let i = 0; i < 6; i++) bf.dust.push({x: nt.x - 4 + i * 2, y: nt.y + 4 - (i % 3) * 3, t: 16, c: '#ffd84a'});
+  }
+  // les oiseaux (pigeons en bas, chauves-souris plus haut) traversent le clocher : les toucher coupe l'élan et le combo
+  if (bf.started && bf.best >= 8 && --bf.birdT <= 0) {
+    const R = bf.rnd, d = R() < .5 ? 1 : -1; bf.birdT = Math.max(150, 420 - bf.best * 2) + R() * 200;
+    bf.birds.push({x: d > 0 ? -14 : BF.W + 14, y: bf.cam + 70 + R() * (BF.H - 170), vx: d * (1 + R() * .8 + Math.min(1, bf.best / 120)), ph: R() * 6, bat: bfZi(bf.best) >= 3});
+  }
+  for (const b of bf.birds) {
+    b.x += b.vx; b.y += Math.sin(bf.tick / 12 + b.ph) * .5;
+    if (!bf.hurt && Math.abs(b.x - hx) < 10 && Math.abs(b.y - hy) < 12) {
+      bf.hurt = 50; bf.vx = Math.sign(b.vx) * 3; if (bf.vy < 0) bf.vy *= .3; bf.rising = false; bf.spin = 0; bfComboEnd(); bfBeep(300, .2, 'sawtooth', 120, .04);
+      for (let i = 0; i < 6; i++) bf.dust.push({x: b.x - 6 + i * 2, y: b.y - 3 + (i % 2) * 6, t: 22, c: b.bat ? '#5a3a6a' : '#e0dee8'});
+    }
+  }
+  bf.birds = bf.birds.filter(b => b.x > -30 && b.x < BF.W + 30);
+  if (bf.hurt) bf.hurt--;
   if (bf.comboT > 0 && --bf.comboT === 0) bfComboEnd();
-  // la caméra suit vers le haut ; dès le 5e étage, le clocher défile tout seul, un peu plus vite toutes les 30 s
-  if (bf.best >= 5) { bf.scroll++; bf.cam -= Math.min(1.7, .35 + Math.floor(bf.scroll / 1800) * .15); }
+  // la caméra suit vers le haut ; dès le 5e étage et un compte à rebours, le clocher défile tout seul, un peu plus vite toutes les 30 s
+  if (bf.count > 0 && --bf.count === 0) { bf.pop = {text: 'LE CLOCHER MONTE !', t: 90}; bfBeep(330, .4, 'square', 660, .04); }
+  if (bf.started && !bf.count) { bf.scroll++; bf.cam -= Math.min(2.55, .52 + Math.floor(bf.scroll / 1800) * .22); }
   bf.cam = Math.min(bf.cam, bf.y - BF.H * .45);
   bfGen(bf.best + 40);
   if (bf.pop && --bf.pop.t <= 0) bf.pop = null;
-  for (const d of bf.dust) { d.t--; d.y -= .2; } bf.dust = bf.dust.filter(d => d.t > 0);
-  if (bf.y - bf.cam > BF.H + 16) bfDie();
+  if (bf.banner && --bf.banner.t <= 0) bf.banner = null;
+  bf.trail.unshift([bf.x, bf.y]); bf.trail.length = Math.min(bf.trail.length, 8);
+  for (const d of bf.dust) { d.t--; d.y -= .3; } bf.dust = bf.dust.filter(d => d.t > 0);
+  if (bf.y - bf.cam > BF.H + 24) bfDie();
+}
+/* ---------- le dessin ---------- */
+function bfHero(g, x, y, face, st, t) {  // le sonneur, dessiné par morceaux (contour d'abord) : st = idle | run | up | down
+  const parts = [], P = (dx, dy, w, h, c) => parts.push([face ? 12 - dx - w : dx, dy, w, h, c]), Q = (dx, dy, w, h, c) => px(g, c, x + (face ? 12 - dx - w : dx), y - 18 + dy, w, h);
+  const ph = st === 'run' ? Math.sin(t / 3.2) : 0, air = st === 'up' || st === 'down', bob = st === 'run' ? Math.abs(Math.round(ph)) : st === 'idle' ? (t >> 5) % 2 : 0, l = Math.round(ph * 2);
+  if (air) P(3, 12, 3, st === 'up' ? 4 : 5, '#3a2418'); else P(4 - l, 13, 2, 5, '#3a2418');
+  P(st === 'up' ? 2 : 3 - l, st === 'up' ? 4 : 8 + bob, 2, 4, '#24448a');
+  P(3, 7 + bob, 6, 6, '#3a6ac8');
+  P(st === 'idle' ? 0 : -1, 2 + bob + (st === 'up' ? 1 : st === 'down' ? -1 : 0), 3, 3, '#7a3a2a');
+  P(2, bob, 8, 7, '#7a3a2a');
+  if (air) P(7, st === 'up' ? 13 : 12, 3, 4, '#5a3a2a'); else P(6 + l, 13, 2, 5, '#5a3a2a');
+  P(st === 'up' ? 8 : 6 + l, st === 'up' ? 3 : 8 + bob, 2, 4, '#3a6ac8');
+  for (const [dx, dy, w, h] of parts) px(g, '#1a1018', x + dx - 1, y - 18 + dy - 1, w + 2, h + 2);
+  for (const [dx, dy, w, h, c] of parts) px(g, c, x + dx, y - 18 + dy, w, h);
+  Q(3, bob, 6, 1, '#a85a3a'); Q(2, 1 + bob, 1, 5, '#a85a3a'); Q(5, 3 + bob, 4, 3, '#ffd0a8'); Q(7, 4 + bob, 1, 1, '#1a1018'); Q(8, 5 + bob, 1, 1, '#f09a8a');
+  Q(3, 10 + bob, 6, 1, '#e0b040'); Q(8, 7 + bob, 1, 6, '#24448a');
+  if (st === 'up') Q(8, 2, 2, 1, '#ffd0a8'); else if (!air) Q(6 + l, 12 + bob, 2, 1, '#ffd0a8');
+}
+function bfBell(g, cx, top, ang, t) {  // une cloche de bronze qui se balance au bout de sa corde
+  px(g, '#3a2414', cx - 1, top - 40, 3, 40); px(g, '#8a6a4a', cx, top - 40, 1, 40);
+  g.save(); g.translate(cx, top); g.rotate(ang);
+  px(g, '#1a1018', -4, -1, 8, 4); px(g, '#6a4a2a', -3, 0, 6, 2);
+  for (let y = 2; y < 18; y++) { const hw = Math.round(y < 5 ? 2 + y * .8 : y < 14 ? 6 + (y - 5) * .25 : 8 + (y - 14) * .9); px(g, '#1a1018', -hw - 1, y, hw * 2 + 2, 1); px(g, '#c88a30', -hw, y, hw * 2, 1); px(g, '#ffe08a', -hw + 1, y, 2, 1); px(g, '#8a5a20', hw - 2, y, 2, 1); }
+  px(g, '#1a1018', -10, 18, 20, 2); px(g, '#a87028', -9, 18, 18, 1); px(g, '#ffd060', -6, 12, 12, 1);
+  const cl = Math.round(-ang * 8); px(g, '#1a1018', cl - 2, 18, 4, 4); px(g, '#5a3010', cl - 1, 19, 2, 2);
+  g.restore();
+}
+const BF_NOTE = ['....##.', '....#.#', '....#..#', '....#..', '....#..', '.####..', '#####..', '.###...'];
+function bfGear(g, cx, cy, r, a, col, dark) {  // une roue dentée qui tourne
+  for (let k = 0; k < 12; k++) { const an = a + k / 12 * Math.PI * 2; px(g, dark, cx + Math.cos(an) * (r + 1) - 2, cy + Math.sin(an) * (r + 1) - 2, 4, 4); }
+  for (let dy = -r; dy <= r; dy++) { const hw = Math.round(Math.sqrt(r * r - dy * dy)); px(g, col, cx - hw, cy + dy, hw * 2, 1); }
+  for (let dy = -r + 4; dy <= r - 4; dy++) { const hw = Math.round(Math.sqrt((r - 4) ** 2 - dy * dy)); px(g, dark, cx - hw, cy + dy, hw * 2, 1); }
+  for (let k = 0; k < 4; k++) { const an = a + k * Math.PI / 2; for (let s = 0; s < r - 3; s++) px(g, col, cx + Math.cos(an) * s - 1, cy + Math.sin(an) * s - 1, 2, 2); }
+  px(g, dark, cx - 3, cy - 3, 6, 6); px(g, col, cx - 1, cy - 1, 2, 2);
+}
+// ce qui décore un étage selon sa zone (n : l'étage, y0 : le haut de sa bande à l'écran)
+function bfDeco(g, n, zi, y0, t) {
+  const h = bfHash(n, 7), L = BF.L, w = BF.R - BF.L, z = BF_Z[zi];
+  if (n <= 4 && n >= 0) { const tips = ['← → : COURIR', 'ESPACE : SAUTER', 'GARDE ESPACE : PLUS HAUT', 'COURS VITE : SAUT PLUS HAUT', "LES MURS RENVOIENT L'ÉLAN"]; PXK.fill(g, tips[n], BF.W / 2, y0 + 26, '#8a7078', 1, 'center'); return; }
+  if (zi === 0) {
+    if (h % 3 === 0) { const x = L + 20 + h % (w - 40), y = y0 + 14, f = (t >> 3) + n & 3;
+      g.fillStyle = 'rgba(255,170,80,.07)'; g.fillRect(x - 16, y - 12, 34, 30); g.fillRect(x - 9, y - 6, 20, 18);
+      px(g, '#1a1018', x - 1, y + 2, 4, 8); px(g, '#6a4a2a', x, y + 3, 2, 7); px(g, '#3a3030', x - 2, y + 9, 6, 2);
+      px(g, '#ff4a3a', x - 1, y - 2 + (f & 1), 4, 5); px(g, '#ff8a3a', x, y - 4 + (f >> 1), 2, 5); px(g, '#ffd84a', x, y, 2, 2); }
+    else if (h % 5 === 1) { const x = L + 30 + h % (w - 70); px(g, '#1a1018', x - 1, y0 + 9, 22, 16); px(g, '#141838', x, y0 + 10, 20, 14); for (let k = 0; k < 4; k++) px(g, '#4a4040', x + 2 + k * 5, y0 + 10, 2, 14); px(g, '#f0e8d8', x + 5 + h % 9, y0 + 14, 1, 1); }
+  } else if (zi === 1) {
+    if (h % 4 === 0) { const x = L + 40 + h % (w - 80), sw = Math.round(Math.sin(t / 40 + n) * 2);
+      px(g, '#3a3030', x, y0, 1, 12); g.fillStyle = 'rgba(255,200,110,.08)'; g.fillRect(x - 14 + sw, y0 + 6, 30, 26);
+      px(g, '#1a1018', x - 4 + sw, y0 + 11, 10, 12); px(g, '#4a3a2a', x - 3 + sw, y0 + 12, 8, 10); px(g, '#ffd84a', x - 2 + sw, y0 + 14, 6, 6); px(g, '#fff0c0', x + sw, y0 + 16, 2, 2); }
+  } else if (zi === 2) {
+    if (h % 3 === 0) { const x = L + 30 + h % (w - 60); g.save(); g.translate(x, y0 + 6); g.rotate(Math.sin(t / 70 + n) * .12); g.globalAlpha = .45;
+      for (let y = 0; y < 26; y++) { const hw = Math.round(y < 6 ? 3 + y * 1.2 : 10 + (y - 6) * .3); px(g, z.hl, -hw, y, hw * 2, 1); } g.globalAlpha = 1; g.restore(); }
+  } else if (zi === 3) {
+    if (n % 10 === 5) { const cx = BF.W / 2, cy = y0 + 22, R = 18;
+      for (let dy = -R - 2; dy <= R + 2; dy++) { const hw = Math.round(Math.sqrt((R + 2) ** 2 - dy * dy)); px(g, '#1a1018', cx - hw, cy + dy, hw * 2, 1); }
+      for (let dy = -R; dy <= R; dy++) { const hw = Math.round(Math.sqrt(R * R - dy * dy)); px(g, '#e8dcc0', cx - hw, cy + dy, hw * 2, 1); }
+      for (let k = 0; k < 12; k++) { const an = k / 12 * Math.PI * 2; px(g, '#3a3030', cx + Math.cos(an) * (R - 3) - 1, cy + Math.sin(an) * (R - 3) - 1, 2, 2); }
+      for (const [len, sp] of [[14, 30], [9, 360]]) { const an = t / sp - Math.PI / 2; for (let s = 0; s < len; s++) px(g, '#1a1018', cx + Math.cos(an) * s, cy + Math.sin(an) * s, 2, 2); } }
+    else if (h % 2 === 0) bfGear(g, L + 24 + h % (w - 48), y0 + 24, 12 + h % 7, (h % 3 ? 1 : -1) * t / 90, z.hl, z.br);
+  } else if (zi === 4) {
+    if (h % 2 === 0) { const x = L + 24 + h % (w - 60), cols = ['#c83a4a', '#3a6ac8', '#e0b040', '#3a9a5a', '#8a4ac8'];
+      g.fillStyle = 'rgba(255,220,170,.05)'; g.beginPath(); g.moveTo(x, y0 + 8); g.lineTo(x + 28, y0 + 8); g.lineTo(x + 70, y0 + 48); g.lineTo(x + 30, y0 + 48); g.fill();
+      for (let y = 0; y < 34; y++) { const half = y < 10 ? Math.round(Math.sqrt(Math.max(0, 100 - (10 - y) ** 2)) * 1.2) : 12; px(g, '#1a1018', x + 14 - half - 2, y0 + 6 + y, half * 2 + 4, 1);
+        for (let xx = -half; xx < half; xx++) px(g, (xx + 100) % 6 === 0 || y % 7 === 0 ? '#2a2030' : cols[(bfHash(n, (xx + 20 >> 2) + (y >> 3) * 10) % 5)], x + 14 + xx, y0 + 6 + y); } }
+  } else {
+    const r = seeded(n * 31 + 7); for (let k = 0; k < 7; k++) { const sx = L + r() * w, sy = y0 + r() * BF.FL, tw = (k + (t >> 4) + n) % 9; px(g, tw ? 'rgba(255,255,255,.7)' : '#ffffff', sx, sy, tw ? 1 : 2, tw ? 1 : 2); }
+    if (n === 112) { for (let dy = -10; dy <= 10; dy++) { const hw = Math.round(Math.sqrt(100 - dy * dy)); px(g, '#f0ecd8', BF.W - 70 - hw, y0 + 24 + dy, hw * 2, 1); } px(g, '#d0c8b0', BF.W - 74, y0 + 20, 4, 3); px(g, '#d0c8b0', BF.W - 66, y0 + 28, 3, 3); }
+    if (h % 3 === 0) { const cx = ((h % w) + t * .1) % (w + 60) + L - 30 | 0; g.fillStyle = 'rgba(200,210,240,.22)'; g.fillRect(cx, y0 + 30, 40, 5); g.fillRect(cx + 8, y0 + 26, 22, 4); }
+  }
 }
 function bfDraw() {
-  const g = bf.g, {W, H, WALL} = BF, cam = Math.round(bf.cam), sy = y => Math.round(y - cam);
+  const g = bf.g, {W, H, L, R, FL} = BF, cam = Math.round(bf.cam), sy = y => Math.round(y - cam), t = bf.tick;
+  bfPad();
   for (; bf.seen < bf.tick; bf.seen++) if (bf.mode === 'over') bfUpdate();
   g.imageSmoothingEnabled = false;
-  const bo = ((Math.floor(-cam * .5) % 160) + 160) % 160;
-  for (let y = bo - 160; y < H; y += 160) g.drawImage(BF_BACK, WALL, y);
-  const wo = ((-cam % 32) + 32) % 32;
-  for (let y = wo - 32; y < H; y += 32) { g.drawImage(BF_BRICK, 0, y); g.drawImage(BF_BRICK, W - WALL, y); }
-  px(g, '#8a6058', WALL - 1, 0, 1, H); px(g, '#8a6058', W - WALL, 0, 1, H); px(g, '#120a0e', WALL, 0, 1, H); px(g, '#120a0e', W - WALL - 1, 0, 1, H);
-  // les étages : une poutre (dessus clair, dessous sombre, chevilles), un panneau tous les 10
-  for (const f of bf.floors) { const y = sy(bfFloorY(f.n)); if (y < -10 || y > H + 6) continue;
-    const [m, hi, lo] = BF_MAT[Math.floor(f.n / 25) % 3];
-    px(g, '#1a1018', f.x - 1, y - 1, f.w + 2, 7); px(g, m, f.x, y, f.w, 5); px(g, hi, f.x, y, f.w, 1); px(g, lo, f.x, y + 4, f.w, 1);
-    for (let x = f.x + 3; x < f.x + f.w - 2; x += 10) px(g, lo, x, y + 2, 1, 1);
-    if (f.n % 10 === 0 && f.n) { const t = String(f.n), sw = t.length * 7 + 6, sx = Math.round(f.x + f.w / 2 - sw / 2); px(g, '#1a1018', sx - 1, y + 5, sw + 2, 13); px(g, '#f0e8d8', sx, y + 6, sw, 11); PXK.fill(g, t, sx + sw / 2, y + 15, '#5a3a2a', PXK.scale(8), 'center'); } }
-  // le sonneur
-  const pose = !bf.ground ? 'jump' : Math.abs(bf.vx) > .3 ? ((bf.tick >> 3) % 2 ? 'run1' : 'run2') : 'idle';
-  if (!(bf.mode === 'over' && bf.dead > 30)) g.drawImage(BF_SPR[pose][bf.face], Math.round(bf.x), sy(bf.y) - BF.PH);
-  if (Math.abs(bf.vx) > 2.6 && bf.ground) for (let i = 1; i < 3; i++) px(g, '#c8b0b8', Math.round(bf.x) + (bf.vx > 0 ? -i * 3 : BF.PW + i * 3 - 1), sy(bf.y) - 3 - i, 2, 1);
-  for (const d of bf.dust) px(g, d.t > 5 ? '#e8d8c8' : '#8a7080', d.x, sy(d.y) - 1);
-  // le bandeau : étage, score, jauge d'élan, combo
-  px(g, '#120a0e', 0, 0, W, 14);
-  pxFont(g, 'Étage ' + bf.best, 4, 10, '#ffffff', 8); pxFont(g, String(bf.score), W - 4, 10, '#ffd84a', 8, 'right');
-  const sp = Math.round(Math.abs(bf.vx) / BF.VMAX * 6); for (let i = 0; i < 6; i++) px(g, i < sp ? (i < 3 ? '#7ee07a' : i < 5 ? '#ffd84a' : '#ff8a3a') : '#3a2a32', 62 + i * 4, 5, 3, 4);
-  if (bf.combo && bf.comboT) { pxFont(g, 'COMBO ' + bf.combo, W / 2, 28, '#ffd84a', 8, 'center'); px(g, '#3a2a32', W / 2 - 20, 31, 40, 2); px(g, '#ffd84a', W / 2 - 20, 31, Math.round(40 * bf.comboT / 180), 2); }
-  if (bf.pop) pxFont(g, bf.pop.text, W / 2, 44 - Math.round((90 - bf.pop.t) / 6), '#ff8a3a', 8, 'center');
-  if (bf.mode === 'play' && bf.best >= 5 && bf.y - cam > H - 40 && (bf.tick >> 3) % 2) pxFont(g, 'MONTE !', W / 2, H - 10, '#ff4a3a', 8, 'center');
-  if (bf.mode === 'ready') gameText(g, W, [['BEFFROI', '#ffc85a', 16], ['← → : courir', '#ffffff'], ['Espace : sauter', '#ffffff'], ['Plus tu cours vite,', '#b8b0c8'], ['plus tu sautes haut', '#b8b0c8'], ['Record ' + (games.best.beffroi || 0), '#ffd84a']], 60);
-  if (bf.mode === 'pause') gameText(g, W, [['PAUSE', '#ffffff', 12], ['Espace : reprendre', '#b8b0c8']], 90);
-  if (bf.mode === 'over' && bf.dead > 40) gameText(g, W, [['TOMBÉ !', '#ff8a3a', 12], ['Étage ' + bf.best + ' · ' + bf.score + ' points', '#ffffff'], [bf.record ? 'NOUVEAU RECORD !' : 'Record ' + (games.best.beffroi || 0), '#ffd84a'], [bf.dead > 60 ? 'Espace : recommencer' : '', '#b8b0c8']], 80);
-  if (bf.tick % 30 === 0) g.canvas.setAttribute('aria-label', 'Beffroi : ' + (bf.mode === 'play' ? 'étage ' + bf.best + ', ' + bf.score + ' points' : bf.mode === 'over' ? 'partie finie à l\'étage ' + bf.best : bf.mode === 'pause' ? 'pause' : 'prêt'));
+  // les étages de fond, bande par bande, chacun dans sa zone ; sous l'étage 0, la terre
+  const nLo = Math.floor(-(cam + H) / FL), nHi = Math.floor(-cam / FL);
+  for (let n = nLo; n <= nHi; n++) {
+    const y0 = sy(bfFloorY(n + 1));
+    if (n < 0) { px(g, '#1a1410', 0, y0, W, FL); for (let k = 0; k < 14; k++) px(g, '#2a2018', (bfHash(n, k) % W), y0 + bfHash(k, n) % FL, 3, 2); continue; }
+    const zi = bfZi(n), T = bfTile(zi);
+    if (BF_Z[zi].sky) px(g, bfMix('#3a4a8a', '#0a0a24', Math.min(1, (n - 100) / 60)), L, y0, R - L, FL); else g.drawImage(T.back, L, y0);
+    bfDeco(g, n, zi, y0, t);
+    g.drawImage(T.wall, 0, y0); g.drawImage(T.wall, R, y0);
+  }
+  px(g, '#00000040', L - 1, 0, 1, H); px(g, '#120a0e', L, 0, 1, H); px(g, '#120a0e', R - 1, 0, 1, H); px(g, '#ffffff18', R, 0, 1, H);
+  // les poutres : dessus clair, dessous sombre, chevilles ; fissures, roues ou éclat selon la sorte ; un panneau tous les 10
+  for (const f of bf.floors) {
+    let y = sy(bfFloorY(f.n)); if (y < -10 || y > H + 10) continue;
+    const [m, hi, lo] = BF_MAT[BF_Z[bfZi(f.n)].mat], x = Math.round(f.x) + (f.br > 0 ? (t >> 1) % 2 * 2 - 1 : 0);
+    if (f.gone) { y += Math.round(f.gone); g.globalAlpha = Math.max(0, 1 - f.gone / 60); }
+    px(g, '#1a1018', x - 1, y - 1, f.w + 2, 9); px(g, m, x, y, f.w, 7); px(g, hi, x, y, f.w, 1); px(g, lo, x, y + 6, f.w, 1);
+    for (let xx = x + 4; xx < x + f.w - 3; xx += 12) px(g, lo, xx, y + 3, 1, 1);
+    if (f.type === 'break') for (let k = 0; k < f.w / 14; k++) { const cx = x + 6 + k * 14 + bfHash(f.n, k) % 6; px(g, '#1a1018', cx, y + 1, 1, 3); px(g, '#1a1018', cx + 1, y + 3, 1, 3); }
+    if (f.type === 'move') { for (const cx of [x + 3, x + f.w - 7]) { px(g, '#1a1018', cx, y + 6, 5, 4); px(g, '#c8c0d0', cx + 1, y + 7, 3, 2); } px(g, '#3a3030', x + f.w / 2, y - FL + 8, 1, FL - 9); }
+    if (f.type === 'slip') { px(g, '#ffffff', x + 3 + (t >> 2) % Math.max(1, f.w - 8), y + 1, 4, 1); px(g, '#fff0c0', x, y + 1, f.w, 1); }
+    if (f.n % 10 === 0 && f.n) { const s = String(f.n), sw = s.length * 7 + 8, sx = Math.round(x + f.w / 2 - sw / 2); px(g, '#1a1018', sx - 1, y + 7, sw + 2, 14); px(g, '#f0e8d8', sx, y + 8, sw, 12); PXK.fill(g, s, sx + sw / 2, y + 17, '#5a3a2a', 1, 'center'); }
+    g.globalAlpha = 1;
+  }
+  for (const b of bf.bells) { const y = sy(b.y); if (y > -30 && y < H + 30) bfBell(g, b.x, y, Math.sin(t / 8) * b.sw + Math.sin(t / 60 + b.n) * .05, t); }
+  for (const nt of bf.notes) { const y = sy(nt.y) + Math.round(Math.sin(t / 15 + nt.n) * 2); if (!nt.got && y > -20 && y < H + 20) sprite(g, BF_NOTE, nt.x - 4, y - 4, {'#': (t >> 4) % 2 ? '#ffd84a' : '#ffe890', '.': null}); }
+  // le sonneur, sa traînée quand il court vite, son salto à pleine vitesse ; il clignote après un oiseau
+  const st = !bf.ground ? (bf.vy < 0 ? 'up' : 'down') : Math.abs(bf.vx) > .3 ? 'run' : 'idle', hc = bf.hc, hg = hc.getContext('2d');
+  hg.clearRect(0, 0, hc.width, hc.height); bfHero(hg, 6, 24, bf.face, st, t);
+  if (!(bf.mode === 'over' && bf.dead > 30) && !(bf.hurt && (t >> 2) % 2)) {
+    if (Math.abs(bf.vx) > 3.8) bf.trail.forEach(([tx, ty], i) => { if (i % 2 && i > 1) { g.globalAlpha = .3 - i * .03; g.drawImage(hc, Math.round(tx) - 6, sy(ty) - 24); } });
+    g.globalAlpha = 1;
+    const x = Math.round(bf.x), y = sy(bf.y);
+    if (bf.spin && bf.spin < 34) { g.save(); g.translate(x + 6, y - 9); g.rotate((bf.face ? -1 : 1) * bf.spin / 34 * Math.PI * 2); g.drawImage(hc, -12, -15); g.restore(); }
+    else g.drawImage(hc, x - 6, y - 24);
+  }
+  if (Math.abs(bf.vx) > 3.8 && bf.ground) for (let i = 1; i < 4; i++) px(g, '#c8b0b8', Math.round(bf.x) + (bf.vx > 0 ? -i * 4 : BF.PW + i * 4 - 2), sy(bf.y) - 3 - i, 3, 1);
+  for (const b of bf.birds) {
+    const x = Math.round(b.x), y = sy(b.y), up = (t >> 3) % 2, d = b.vx > 0, body = b.bat ? '#3a2a4a' : '#9a98a8', wing = b.bat ? '#5a3a6a' : '#c8c6d0';
+    px(g, '#1a1018', x - 6, y - 3, 12, 6); px(g, body, x - 5, y - 2, 10, 4); px(g, '#1a1018', x + (d ? 3 : -7), y - 5, 5, 5); px(g, body, x + (d ? 4 : -6), y - 4, 3, 3);
+    px(g, b.bat ? '#ff4a3a' : '#1a1018', x + (d ? 5 : -5), y - 3, 1, 1); if (!b.bat) px(g, '#e0a040', x + (d ? 7 : -8), y - 3, 2, 1); else { px(g, body, x + (d ? 4 : -6), y - 6, 1, 2); px(g, body, x + (d ? 6 : -4), y - 6, 1, 2); }
+    px(g, '#1a1018', x - 3, up ? y - 8 : y, 6, up ? 7 : 6); px(g, wing, x - 2, up ? y - 7 : y + 1, 4, up ? 5 : 4);
+  }
+  for (const d of bf.dust) px(g, d.t > 6 ? d.c : '#8a7080', d.x, sy(d.y) - 1, 2, 2);
+  // le danger en bas quand le clocher défile et qu'on traîne
+  if (bf.mode === 'play' && bf.started && !bf.count && bf.y - cam > H - 90) { g.fillStyle = 'rgba(255,60,40,' + ((.12 + .08 * Math.sin(t / 5)) * Math.min(1, (bf.y - cam - H + 90) / 60)).toFixed(3) + ')'; g.fillRect(0, H - 40, W, 40); }
+  // le bandeau : étage, jauge d'élan, score, notes, combo
+  px(g, '#120a0e', 0, 0, W, 20); px(g, '#3e2a30', 0, 20, W, 1);
+  pxFont(g, 'Étage ' + bf.best, 5, 14, '#ffffff', 8); pxFont(g, String(bf.score), W - 5, 14, '#ffd84a', 8, 'right');
+  const sp = Math.round(Math.abs(bf.vx) / BF.VMAX * 8); for (let i = 0; i < 8; i++) px(g, i < sp ? (i < 4 ? '#7ee07a' : i < 7 ? '#ffd84a' : '#ff8a3a') : '#3a2a32', 86 + i * 6, 7, 5, 6);
+  if (bf.got) { sprite(g, BF_NOTE, W - 30, 25, {'#': '#ffd84a', '.': null}); pxFont(g, String(bf.got), W - 32, 34, '#ffd84a', 8, 'right'); }
+  if (bf.combo && bf.comboT) { pxFont(g, 'COMBO ' + bf.combo, W / 2, 40, '#ffd84a', 8, 'center'); px(g, '#3a2a32', W / 2 - 30, 44, 60, 2); px(g, '#ffd84a', W / 2 - 30, 44, Math.round(60 * bf.comboT / 180), 2); }
+  if (bf.pop) pxFont(g, bf.pop.text, W / 2, 62 - Math.round((90 - Math.min(90, bf.pop.t)) / 6), '#ff8a3a', 8, 'center');
+  if (bf.banner) { const a = Math.min(1, bf.banner.t / 20, (150 - bf.banner.t) / 15); g.globalAlpha = a; gameText(g, W, [[bf.banner.text, '#ffc85a', 8]], 110); g.globalAlpha = 1; }
+  if (bf.count) pxFont(g, String(Math.ceil(bf.count / 60)), W / 2, 150, '#ffd84a', 24, 'center');
+  if (bf.mode === 'play' && bf.started && !bf.count && bf.y - cam > H - 60 && (t >> 3) % 2) pxFont(g, 'MONTE !', W / 2, H - 14, '#ff4a3a', 16, 'center');
+  if (bf.mode === 'ready') gameText(g, W, [['BEFFROI', '#ffc85a', 24], ['', '#ffffff'], ['← → : courir', '#ffffff'], ['Espace : sauter', '#ffffff'], ['Garde Espace pour monter plus haut', '#b8b0c8'], ['Plus tu cours vite, plus tu sautes haut', '#b8b0c8'], ['Les cloches font rebondir', '#b8b0c8'], ['Record ' + (games.best.beffroi || 0), '#ffd84a']], 90);
+  if (bf.mode === 'pause') gameText(g, W, [['PAUSE', '#ffffff', 16], ['Espace : reprendre', '#b8b0c8']], 140);
+  if (bf.mode === 'over' && bf.dead > 40) gameText(g, W, [['TOMBÉ !', '#ff8a3a', 16], ['', '#ffffff'], ['Étage ' + bf.best + ' · ' + bf.score + ' points', '#ffffff'], [bf.got + ' notes · ' + bf.rang + ' cloches', '#b8b0c8'], [bf.record ? 'NOUVEAU RECORD !' : 'Record ' + (games.best.beffroi || 0), '#ffd84a'], [bf.dead > 60 ? 'Espace : recommencer' : '', '#b8b0c8']], 120);
+  if (t % 30 === 0) g.canvas.setAttribute('aria-label', 'Beffroi : ' + (bf.mode === 'play' ? 'étage ' + bf.best + ', ' + bf.score + ' points' : bf.mode === 'over' ? 'partie finie à l\'étage ' + bf.best : bf.mode === 'pause' ? 'pause' : 'prêt'));
+}
+// la manette : stick ou croix pour courir, A, B ou haut pour sauter, Start pour partir ou mettre en pause
+function bfPad() {
+  const p = navigator.getGamepads ? [...navigator.getGamepads()].find(Boolean) : null, b = i => !!p?.buttons[i]?.pressed;
+  const x = p ? (Math.abs(p.axes[0]) > .35 ? Math.sign(p.axes[0]) : (b(15) ? 1 : 0) - (b(14) ? 1 : 0)) : 0, j = b(0) || b(1) || b(12), s = b(9), prev = bf.pad || {};
+  bf.pad = {x, j, s};
+  if (!view.classList.contains('on')) return;
+  if (bf.mode !== 'play' && ((j && !prev.j) || (s && !prev.s))) bfStart();
+  else if (bf.mode === 'play' && s && !prev.s) { bf.mode = 'pause'; bf.keys.clear(); }
 }
 function bfInfo() {
-  $('bfStats').replaceChildren(...[['Meilleur score', games.best.beffroi || 0], ['Parties', bfs.games], ['Étages montés', bfs.floors], ['Combos', bfs.combos]].flatMap(([a, b]) => [el('span', '', a), el('b', '', String(b))]));
+  $('bfStats').replaceChildren(...[['Meilleur score', games.best.beffroi || 0], ['Plus haut étage', bfs.top], ['Parties', bfs.games], ['Étages montés', bfs.floors], ['Combos', bfs.combos], ['Notes', bfs.notes], ['Cloches sonnées', bfs.bells]].flatMap(([a, b]) => [el('span', '', a), el('b', '', String(b))]));
 }
 function bfStart() {
   if (bf.mode === 'ready' || bf.mode === 'pause') { bf.mode = 'play'; return true; }
@@ -474,18 +647,27 @@ document.addEventListener('keydown', e => {
 document.addEventListener('keyup', e => { if (bf) bf.keys.delete(e.key.length === 1 ? e.key.toLowerCase() : e.key); });
 // au doigt ou à la souris : appuyer à gauche / à droite fait courir, au milieu fait sauter
 { const cv = $('bfCanvas'), zone = e => { const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width; return x < .35 ? 'ArrowLeft' : x > .65 ? 'ArrowRight' : ' '; };
-  cv.onpointerdown = e => { e.preventDefault(); if (!bf || bfStart()) return; const z = zone(e); bf.ptr = z; bf.keys.add(z); cv.setPointerCapture(e.pointerId); };
+  cv.onpointerdown = e => { e.preventDefault(); if (!bf || bfStart()) return; const z = zone(e); bf.ptr = z; bf.keys.add(z); try { cv.setPointerCapture(e.pointerId); } catch {} };
   cv.onpointerup = cv.onpointercancel = () => { if (bf?.ptr) { bf.keys.delete(bf.ptr); bf.ptr = null; } }; }
 $('bfNew').onclick = () => { bfNew(); $('bfNew').blur(); };
-{  // vérification : un saut sur place passe un étage, un saut lancé à fond en passe au moins 3 ; on se pose sur une poutre en descendant, pas en montant
+$('bfFs').onclick = () => { $('bfCanvas').parentElement.requestFullscreen?.().catch(() => {}); $('bfFs').blur(); };
+{  // vérification : un saut sur place passe un étage, un saut lancé à fond au moins 3 ; on se pose en descendant ; lâcher la touche raccourcit le saut ;
+   // on peut encore sauter juste après avoir quitté une poutre ; une cloche relance vers le haut
   const keep = bf; bf = null; bfNew();
   const h = v => (BF.J0 + v * BF.JV) ** 2 / (2 * BF.G);
-  bf.mode = 'play'; bf.x = 60; bf.y = 0; bf.ground = bf.floors[0]; bf.cam = -150; bf.vx = 0; bfJump(); let n = 0, maxUp = 0; while (n++ < 200) { bfUpdate(); maxUp = Math.max(maxUp, -bf.y); if (bf.ground) break; }
-  console.assert(h(0) > BF.FL + 4 && h(BF.VMAX) > 3 * BF.FL && bf.ground && bf.ground.n === 1 && maxUp > BF.FL, 'beffroi', {h0: h(0), hmax: h(BF.VMAX), land: bf.ground?.n, maxUp});
+  const jump = hold => { bfNew(); bf.mode = 'play'; bf.x = 60; bf.y = 0; bf.ground = bf.floors[0]; bf.cam = -250; bf.vx = 0; bf.keys.add(' '); bfUpdate(); if (!hold) bf.keys.clear(); let n = 0, up = 0; while (n++ < 200) { bfUpdate(); up = Math.max(up, -bf.y); if (bf.ground) break; } bf.keys.clear(); return {up, land: bf.ground?.n}; };
+  const full = jump(true), tap = jump(false);
+  bfNew(); bf.mode = 'play'; bf.ground = null; bf.coy = 3; bf.y = -5; bf.vy = 0; bf.keys.add(' '); bfUpdate(); const coyote = bf.vy < 0; bf.keys.clear();
+  bfNew(); bf.mode = 'play'; bf.ground = null; bf.y = -100; bf.vy = 2; bf.x = 100; bf.bells = [{x: 106, y: -112, cd: 0, sw: 0, n: 2}]; bfUpdate(); const bell = bf.vy < -BF.J0;
+  const ok = h(0) > BF.FL + 4 && h(BF.VMAX) > 3 * BF.FL && full.land === 1 && full.up > BF.FL && tap.up < full.up - 10 && coyote && bell;
+  console.assert(ok, 'beffroi', {h0: h(0), hmax: h(BF.VMAX), full, tap, coyote, bell});
+  view.dataset.selfcheck = ok ? 'ok' : JSON.stringify({full, tap, coyote, bell});
   bf = keep;
 }
 ctx.onOpen(() => {
-  if (!bf || !bf.g) { bfNew(); bf.g = $('bfCanvas').getContext('2d'); }
+  if (!bf || !bf.g) { bfNew(); bf.g = $('bfCanvas').getContext('2d'); bf.hc = el('canvas'); bf.hc.width = 24; bf.hc.height = 30; }
+  $('bfCanvas').__bf = {st: () => bf, s: () => bfs, gen: bfGen, upd: bfUpdate,
+    warp: n => { bfGen(n + 40); const f = bf.floors[n]; bf.mode = 'play'; bf.x = f.x + f.w / 2 - 6; bf.y = bfFloorY(n); bf.vy = 0; bf.vx = 0; bf.ground = f; bf.last = n; bf.best = Math.max(bf.best, n); bf.cam = bf.y - BF.H * .55; bf.zi = bfZi(n); bf.started = n >= 5; bf.count = 0; return 0; }};
   gameLoop(bf, 'beffroi', bfUpdate, bfDraw); bfInfo();
 });
 }
