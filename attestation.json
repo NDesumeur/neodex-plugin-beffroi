@@ -1,9 +1,9 @@
 {
   "pluginId": "neodex.beffroi",
   "repo": "NDesumeur/neodex-plugin-beffroi",
-  "version": "1.1.0",
-  "sha256": "c75209b97751d2286bdb6a068cc5195a529902c9e35e4c2a3995288c56e05ea7",
-  "approvedAt": "2026-11-16T04:04:37.355Z",
+  "version": "1.1.1",
+  "sha256": "bf935e2dd2a75a173f66d1d25e2a096dd144ebe4aa5965fd62c7a8ef838e0ab7",
+  "approvedAt": "2026-11-16T16:38:46.403Z",
   "neobase": ">=4.0.0",
-  "signature": "Z3ddN4ti21hoHLcoPbXGVTsuYIUIeS3GONnoUBvOc544cUPCnIAQeG0/Llb5UcZRHELLVl0ddxDZitpbz86QAg=="
+  "signature": "Ys/VhQKWruowya5AtmAmXHOw2FnQT4G/zWlSnxGgNrvj+hbDdJb1kMzJKytrHzLCKVsSXoQ6ZwVn4Qa0UxyoCg=="
 }
