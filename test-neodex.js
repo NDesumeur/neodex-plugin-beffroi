@@ -27,6 +27,15 @@ module.exports = async ({ pj, sleep }) => {
   if (Math.abs(await S(`b.floors[${mv}].x`) - x0) < .5) throw new Error('la poutre mobile ne bouge pas');
   await S(`(b.y = b.cam + 400, 0)`); await sleep(1500); await shot('4-fin');
   if (await S('b.mode') !== 'over' || await S('s.games') < 1) throw new Error('la chute ne finit pas la partie');
+  // 1.2.0 : choisir un personnage, l'annonce d'un gros combo, l'acrobate et son second saut
+  await pj(`document.getElementById('bfNew').click(), 0`); await S('(s.top = 70, 0)'); await sleep(200); await key('keydown', 'ArrowRight'); await key('keyup', 'ArrowRight'); await sleep(300);
+  const ch = await S('b.ch.name'); if (ch !== 'La funambule') throw new Error('← → devait changer de personnage : ' + ch); await shot('5-personnage');
+  await key('keydown', 'ArrowRight'); await key('keyup', 'ArrowRight'); await key('keydown', ' '); await key('keyup', ' '); await sleep(200);
+  await S(`${B}.warp(30)`); await S(`(() => { b.combo = 34; b.comboN = 5; ${B}.comboEnd(); return 0; })()`); await sleep(250); await shot('6-combo');
+  const ann = await S('b.ann && b.ann.word'); if (ann !== 'INCROYABLE !') throw new Error('le gros combo devait être annoncé : ' + ann);
+  const dbl = await S(`(() => { b.ann = null; b.ground = null; b.coy = 0; b.y -= 20; b.vy = 2; return b.ch.dbl ? 1 : 0; })()`); await key('keydown', ' '); await sleep(60); await key('keyup', ' ');
+  if (!dbl || !(await S('b.dbl'))) throw new Error('l’acrobate devait sauter une seconde fois en l’air');
+  await sleep(200); await shot('7-acrobate');
   const lay = await pj(`(() => { const c = document.getElementById('bfCanvas').getBoundingClientRect(), s = document.querySelector('.gSide').getBoundingClientRect(); return { beside: s.left >= c.right - 1, fits: document.documentElement.scrollWidth <= innerWidth + 1, w: innerWidth }; })()`);
   if (!lay.fits || (lay.w >= 700 && !lay.beside)) throw new Error('mise en page : ' + JSON.stringify(lay));
   await pj(`document.getElementById('bfFs').click(), 0`); await sleep(700);
@@ -38,5 +47,5 @@ module.exports = async ({ pj, sleep }) => {
     if (process.env.NEO_FIT_LOG) console.log('FIT', JSON.stringify(L));
     if (L.bottom > L.wh + 1 || L.sw > L.ww + 1) throw new Error('la zone de jeu dépasse la fenêtre : ' + JSON.stringify(L));
   }
-  return 'montée au clavier : étage ' + climbed + ' · cloche, note, oiseau, poutres · fenêtre ' + lay.w + ' px';
+  return 'montée au clavier : étage ' + climbed + ' · personnages · annonce des combos · second saut · cloche, note, oiseau, poutres · fenêtre ' + lay.w + ' px';
 };

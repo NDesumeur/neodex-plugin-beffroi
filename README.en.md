@@ -4,6 +4,12 @@ A pixel art jumping game: a little bell ringer climbs the floors of a bell tower
 
 *Version française : [README.md](README.md)*
 
+## Announced combos, characters and achievements (new in 1.2.0)
+
+- **Big combos are announced**: at the end of a combo (at least two jumps of 2 floors or more), the word bursts out in large letters in the middle of the screen, depending on the combo size: NICE (4 floors), SUPER (7), GREAT (12), TERRIFIC (20), INCREDIBLE (30), FABULOUS (45), EXTRAORDINARY (70), LEGENDARY (100). Below: the floors, the number of jumps and the points (the square of the floors). A shower of sparks bursts from the bell-ringer, the arpeggio gets longer for big combos, the screen flashes from GREAT on and the colours cycle. A jump of 4 floors or more at once is shown too ("5 FLOORS!"); the combo counter grows from 12.
+- **Three characters**, chosen with ← → on the start screen: **the bell-ringer**, balanced; **the tightrope walker** (unlocked at a 30-floor record), who accelerates and runs faster but jumps a little lower; **the acrobat** (unlocked at 60), who can **jump a second time in the air**, once per jump. Each has their own colours.
+- **Six trick achievements**, in the ACHIEVEMENTS card: 100 floors without touching a wall, a 50-floor combo, 10 bells in one game, 30 notes in one game, floor 100, 80 floors without touching a bird. A green banner announces each one you unlock.
+
 ## Controls
 
 - **← →** (or **Q D**, **A D**): run.

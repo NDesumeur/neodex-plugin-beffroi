@@ -4,6 +4,12 @@ Un jeu de saut en pixel art : un petit sonneur monte les étages d'un clocher en
 
 *English version: [README.en.md](README.en.md)*
 
+## Combos annoncés, personnages et succès (nouveau en 1.2.0)
+
+- **L'annonce des gros combos** : à la fin d'un combo (au moins deux sauts de 2 étages ou plus), le mot jaillit en grand au milieu de l'écran, selon la taille du combo : BIEN (4 étages), SUPER (7), GÉNIAL (12), FORMIDABLE (20), INCROYABLE (30), FABULEUX (45), EXTRAORDINAIRE (70), LÉGENDAIRE (100). Dessous : les étages, le nombre de sauts et les points (le carré des étages). Une gerbe d'étincelles part du sonneur, l'arpège est plus long pour les gros combos, l'écran s'illumine dès GÉNIAL et les couleurs tournent. Un saut de 4 étages ou plus d'un coup s'affiche aussi (« 5 ÉTAGES ! ») ; le compteur du combo grossit à partir de 12.
+- **Trois personnages**, à choisir avec ← → sur l'écran de départ : **le sonneur**, équilibré ; **la funambule** (ouverte à 30 étages de record), qui accélère plus vite et court plus vite mais saute un peu moins haut ; **l'acrobate** (ouvert à 60), qui peut **sauter une seconde fois en l'air**, une fois par saut. Chacun a ses couleurs.
+- **Six succès de figure**, dans la carte SUCCÈS : 100 étages sans toucher un mur, un combo de 50 étages, 10 cloches dans une partie, 30 notes dans une partie, l'étage 100, 80 étages sans toucher un oiseau. Un bandeau vert annonce chaque succès débloqué.
+
 ## Commandes
 
 - **← →** (ou **Q D**, **A D**) : courir.

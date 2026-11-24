@@ -6,7 +6,8 @@ const HTML = `<div class="appWrap wide">
     <div class="gSide">
       <div class="sysCard"><b>RECORDS</b><div class="gStats" id="bfStats"></div></div>
       <div class="row"><button class="btn main" id="bfNew">NOUVELLE PARTIE</button><button class="btn" id="bfFs">PLEIN ÉCRAN</button></div>
-      <div class="hint">Plus tu cours vite, plus tu sautes haut : la jauge en haut montre ta vitesse. Garde la touche de saut pour monter plus haut, lâche-la pour un petit saut. Les murs te renvoient sans freiner. Les cloches te relancent vers le haut, les notes rapportent des points, les oiseaux coupent ton élan. Certaines poutres bougent, cassent ou glissent. Dès le 5e étage, après un compte à rebours, le clocher défile tout seul, de plus en plus vite : s'il te rattrape, c'est perdu. Enchaîne les sauts de 2 étages ou plus pour un combo : il rapporte le carré des étages gagnés.</div>
+      <div class="hint">Plus tu cours vite, plus tu sautes haut : la jauge en haut montre ta vitesse. Garde la touche de saut pour monter plus haut, lâche-la pour un petit saut. Les murs te renvoient sans freiner. Les cloches te relancent vers le haut, les notes rapportent des points, les oiseaux coupent ton élan. Certaines poutres bougent, cassent ou glissent. Dès le 5e étage, après un compte à rebours, le clocher défile tout seul, de plus en plus vite : s'il te rattrape, c'est perdu. Enchaîne les sauts de 2 étages ou plus pour un combo : il rapporte le carré des étages gagnés, et les gros combos sont annoncés en grand (BIEN, SUPER, GÉNIAL… jusqu'à LÉGENDAIRE).</div><div class="hint">Trois personnages, à choisir avec ← → avant de partir : le sonneur, équilibré ; la funambule (record de 30 étages), qui file vite mais saute un peu moins haut ; l'acrobate (record de 60), qui peut sauter une seconde fois en l'air.</div>
+      <div class="sysCard"><b>SUCCÈS</b><div class="gStats" id="bfAch"></div></div>
     </div></div>
 </div>`;
 const CSS = `.gMain{display:flex;gap:22px;align-items:flex-start;flex-wrap:wrap}
@@ -331,7 +332,22 @@ const pxFont = (g, text, x, y, color, size = 8, align = 'left') => { const s = P
    Après le 5e étage et un compte à rebours, le clocher se met à défiler : il ne faut pas rester en bas. 48 px = 1 étage ---------- */
 const BF = {W: 240, H: 320, WALL: 16, FL: 48, PW: 12, PH: 18, G: .33, AX: .3, VMAX: 4.8, J0: 6.45, JV: .8, VY: 10.5, BELL: 1.45};
 BF.L = BF.WALL; BF.R = BF.W - BF.WALL;
-const bfs = gstore('beffroi', {games: 0, floors: 0, combos: 0}); bfs.notes ??= 0; bfs.bells ??= 0; bfs.top ??= 0;
+const bfs = gstore('beffroi', {games: 0, floors: 0, combos: 0}); bfs.notes ??= 0; bfs.bells ??= 0; bfs.top ??= 0; bfs.ch ??= 0; bfs.ach ??= {}; bfs.bestCombo ??= 0;
+// les personnages : course (ax), vitesse max, saut, second saut en l'air ; ils s'ouvrent avec le record d'étages
+const BF_CH = [
+  {name: 'Le sonneur', what: 'équilibré', open: 0, ax: 1, vmax: 1, j0: 1, pal: {hood: '#7a3a2a', hoodL: '#a85a3a', tunic: '#3a6ac8', sleeve: '#24448a', belt: '#e0b040'}},
+  {name: 'La funambule', what: 'file vite, saute un peu moins haut', open: 30, ax: 1.35, vmax: 1.08, j0: .93, pal: {hood: '#b02a4a', hoodL: '#e8607a', tunic: '#e8e0f0', sleeve: '#9a90b8', belt: '#3a6ac8'}},
+  {name: 'L’acrobate', what: 'un second saut en l’air', open: 60, ax: .9, vmax: .95, j0: .97, dbl: true, pal: {hood: '#2a6a3a', hoodL: '#4aa85a', tunic: '#e8b830', sleeve: '#a87a10', belt: '#c83a3a'}},
+];
+const bfChOk = i => bfs.top >= BF_CH[i].open;
+// les mots des combos, du plus petit au plus grand (le dernier atteint est annoncé)
+const BF_PRAISE = [[4, 'BIEN !'], [7, 'SUPER !'], [12, 'GÉNIAL !'], [20, 'FORMIDABLE !'], [30, 'INCROYABLE !'], [45, 'FABULEUX !'], [70, 'EXTRAORDINAIRE !'], [100, 'LÉGENDAIRE !']];
+const BF_ACH = [['murs', 'Sans les murs', '100 étages sans toucher un mur'], ['combo', 'Grand combo', 'un combo de 50 étages'], ['cloches', 'Carillon', '10 cloches dans une partie'],
+  ['notes', 'Mélomane', '30 notes dans une partie'], ['sommet', 'Le sommet', 'atteindre l’étage 100'], ['oiseaux', 'Ciel dégagé', '80 étages sans toucher un oiseau']];
+function bfAch(id) {  // un succès débloqué : bandeau, petite fanfare
+  if (bfs.ach[id]) return; const a = BF_ACH.find(x => x[0] === id); bfs.ach = {...bfs.ach, [id]: 1}; saveGames(); bfInfo();
+  if (bf) bf.achBan = {text: 'SUCCÈS : ' + a[1], t: 160}; [784, 988, 1175, 1568].forEach((f, i) => setTimeout(() => bfBeep(f, .14, 'triangle', 0, .05), i * 80));
+}
 let bf = null, bfac = null;
 const bfHash = (a, b = 0) => { let h = Math.imul(a + 374761393, 668265263) ^ Math.imul(b + 1274126177, 2246822519); h = Math.imul(h ^ h >>> 13, 1274126177); return (h ^ h >>> 16) >>> 0; };
 const bfMix = (a, b, k) => { const p = h => [1, 3, 5].map(i => parseInt(h.substr(i, 2), 16)), x = p(a), y = p(b); return '#' + x.map((v, i) => Math.round(v + (y[i] - v) * k).toString(16).padStart(2, '0')).join(''); };
@@ -366,7 +382,8 @@ function bfNew() {
   const g = bf?.g, hc = bf?.hc;
   bf = renew(bf, {g, hc, mode: 'ready', tick: 0, seen: 0, x: BF.W / 2 - BF.PW / 2, y: 0, vx: 0, vy: 0, ground: 0, face: 0, keys: new Set(), floors: [], bells: [], notes: [], birds: [], cam: -BF.H + 60, scroll: 0,
     score: 0, combo: 0, comboN: 0, comboT: 0, last: 0, best: 0, pop: null, banner: null, dead: 0, record: false, rnd: seeded(Date.now() % 1e9), dust: [], trail: [],
-    coy: 0, buf: 0, jPrev: false, rising: false, hurt: 0, spin: 0, count: 0, started: false, birdT: 300, zi: 0, got: 0, rang: 0});
+    coy: 0, buf: 0, jPrev: false, rising: false, hurt: 0, spin: 0, count: 0, started: false, birdT: 300, zi: 0, got: 0, rang: 0,
+    ch: BF_CH[bfChOk(bfs.ch) ? bfs.ch : 0], dbl: false, ann: null, achBan: null, wallFrom: 0, birdFrom: 0, flash: 0});
   bf.ground = null; bfGen(60); bf.ground = bf.floors[0]; bfInfo();
 }
 // les étages : le 0, les 5 premiers, chaque début de zone et tous les 50 prennent toute la largeur ; ensuite des poutres de plus en plus courtes,
@@ -387,18 +404,26 @@ function bfGen(upTo) {
 function bfBeep(f, d, type = 'square', slide = 0, vol = .04) { try { bfac ??= new AudioContext(); const o = bfac.createOscillator(), g = bfac.createGain(), t = bfac.currentTime; o.type = type; o.frequency.setValueAtTime(f, t); if (slide) o.frequency.exponentialRampToValueAtTime(slide, t + d); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.0001, t + d); o.connect(g).connect(bfac.destination); o.start(t); o.stop(t + d); } catch {} }
 // une suite de sauts d'au moins 2 étages : un combo ; il se termine sur un petit saut ou après 3 s ; il rapporte (étages du combo)² si au moins 2 sauts
 function bfComboEnd() {
-  if (bf.comboN >= 2) { const pts = bf.combo * bf.combo; bf.score += pts; bfs.combos++; bf.pop = {text: 'COMBO ' + bf.combo + ' ! +' + pts, t: 90}; bfBeep(660, .1); setTimeout(() => bfBeep(990, .2), 90); }
+  if (bf.comboN >= 2) {
+    const pts = bf.combo * bf.combo, tier = BF_PRAISE.filter(([m]) => bf.combo >= m).length; bf.score += pts; bfs.combos++; bfs.bestCombo = Math.max(bfs.bestCombo, bf.combo);
+    bf.ann = {word: tier ? BF_PRAISE[tier - 1][1] : 'COMBO !', combo: bf.combo, jumps: bf.comboN, pts, tier, t: 130}; bf.flash = tier >= 3 ? 10 : 0;
+    const cx = bf.x + 6, cy = bf.y - 20; for (let i = 0; i < 8 + tier * 6; i++) { const a = i / (8 + tier * 6) * 6.28; bf.dust.push({x: cx + Math.cos(a) * 6, y: cy + Math.sin(a) * 6, vx: Math.cos(a) * (1.5 + tier * .3), vy: Math.sin(a) * (1.5 + tier * .3), t: 26 + tier * 3, c: ['#ffd84a', '#ff8a3a', '#7ee07a', '#8ad8ff', '#ff6ad8'][i % 5]}); }
+    [523, 659, 784, 1047, 1319, 1568, 2093, 2637, 3136].slice(0, 2 + tier).forEach((f, i) => setTimeout(() => bfBeep(f, .14, i % 2 ? 'triangle' : 'square', 0, .04), i * 70));
+    if (bf.combo >= 50) bfAch('combo');
+  }
   bf.combo = bf.comboN = 0; bf.comboT = 0;
 }
 function bfLand(f) {
   const gained = f.n - bf.last;
   if (gained >= 2) { bf.combo += gained; bf.comboN++; bf.comboT = 180; } else if (gained !== 0 || bf.comboT <= 0) bfComboEnd();
-  bf.last = f.n; bf.ground = f; bf.spin = 0; bf.rising = false;
+  bf.last = f.n; bf.ground = f; bf.spin = 0; bf.rising = false; bf.dbl = false;
+  if (gained >= 4) bf.pop = {text: gained + ' ÉTAGES !', t: 70};
   if (f.type === 'break' && !f.br) f.br = 36;
   if (f.n > bf.best) {
     bf.score += (f.n - bf.best) * 10; bf.best = f.n;
     const zi = bfZi(f.n); if (zi > bf.zi) { bf.zi = zi; bf.banner = {text: BF_Z[zi].name, t: 150}; bfBeep(523, .15, 'triangle'); setTimeout(() => bfBeep(784, .3, 'triangle'), 120); }
     if (f.n >= 5 && !bf.started) { bf.started = true; bf.count = 180; }
+    if (bf.best - bf.wallFrom >= 100) bfAch('murs'); if (bf.best - bf.birdFrom >= 80) bfAch('oiseaux'); if (bf.best >= 100) bfAch('sommet');
   }
   for (let i = 0; i < 5; i++) bf.dust.push({x: bf.x + 1 + i * 2.5, y: bf.y, t: 12, c: '#e8d8c8'});
   bfBeep(gained >= 2 ? 520 : 300, .05, 'triangle');
@@ -411,8 +436,8 @@ function bfDie() {
 }
 function bfJump() {
   if (bf.mode !== 'play' || !(bf.ground || bf.coy > 0)) return;
-  bf.vy = -(BF.J0 + Math.abs(bf.vx) * BF.JV); bf.ground = null; bf.coy = 0; bf.buf = 0; bf.rising = true;
-  bf.spin = Math.abs(bf.vx) > BF.VMAX * .92 ? 1 : 0;  // à pleine vitesse : un salto
+  bf.vy = -(BF.J0 * bf.ch.j0 + Math.abs(bf.vx) * BF.JV); bf.ground = null; bf.coy = 0; bf.buf = 0; bf.rising = true;
+  bf.spin = Math.abs(bf.vx) > BF.VMAX * bf.ch.vmax * .92 ? 1 : 0;  // à pleine vitesse : un salto
   bfBeep(220 + Math.abs(bf.vx) * 55, .12, 'square', 520 + Math.abs(bf.vx) * 80, .03);
 }
 function bfUpdate() {
@@ -427,14 +452,16 @@ function bfUpdate() {
     if (f.gone) f.gone += .3 + f.gone * .05;
   }
   // la course : on accélère vers la touche, on freine au sol sans touche (presque pas sur une poutre qui glisse)
-  if (dir) { bf.vx = Math.max(-BF.VMAX, Math.min(BF.VMAX, bf.vx + dir * BF.AX)); bf.face = dir < 0 ? 1 : 0; }
+  const vmax = BF.VMAX * bf.ch.vmax;
+  if (dir) { bf.vx = Math.max(-vmax, Math.min(vmax, bf.vx + dir * BF.AX * bf.ch.ax)); bf.face = dir < 0 ? 1 : 0; }
   else if (bf.ground) bf.vx *= bf.ground.type === 'slip' ? .985 : .82;
   if (Math.abs(bf.vx) < .05) bf.vx = 0;
   bf.x += bf.vx;
-  if (bf.x < BF.L) { bf.x = BF.L; bf.vx = Math.abs(bf.vx) * .9; bf.face = 0; if (!bf.ground) bfBeep(160, .04, 'square', 0, .02); }  // le mur renvoie l'élan
-  if (bf.x > BF.R - BF.PW) { bf.x = BF.R - BF.PW; bf.vx = -Math.abs(bf.vx) * .9; bf.face = 1; if (!bf.ground) bfBeep(160, .04, 'square', 0, .02); }
+  if (bf.x < BF.L) { bf.x = BF.L; bf.vx = Math.abs(bf.vx) * .9; bf.face = 0; bf.wallFrom = bf.best; if (!bf.ground) bfBeep(160, .04, 'square', 0, .02); }  // le mur renvoie l'élan
+  if (bf.x > BF.R - BF.PW) { bf.x = BF.R - BF.PW; bf.vx = -Math.abs(bf.vx) * .9; bf.face = 1; bf.wallFrom = bf.best; if (!bf.ground) bfBeep(160, .04, 'square', 0, .02); }
   // le saut : gardé en mémoire un instant si on appuie trop tôt, possible encore un instant après avoir quitté une poutre ; lâcher la touche le raccourcit
-  if (jk && !bf.jPrev) bf.buf = 8; bf.jPrev = jk;
+  const press = jk && !bf.jPrev; if (press) bf.buf = 8; bf.jPrev = jk;
+  if (press && bf.ch.dbl && !bf.ground && bf.coy <= 0 && !bf.dbl) { bf.dbl = true; bf.buf = 0; bf.vy = -BF.J0 * .78; bf.rising = true; bf.spin = 1; bfBeep(700, .1, 'square', 1100, .03); for (let i = 0; i < 5; i++) bf.dust.push({x: bf.x + i * 3, y: bf.y, t: 12, c: '#ffffff'}); }  // l'acrobate : un second saut
   if ((bf.buf > 0 || (jk && bf.ground)) && (bf.ground || bf.coy > 0)) bfJump();
   if (bf.buf > 0) bf.buf--;
   if (bf.rising && !jk && bf.vy < -2) { bf.vy *= .5; bf.rising = false; }
@@ -451,12 +478,12 @@ function bfUpdate() {
   for (const b of bf.bells) {
     if (b.cd) b.cd--; b.sw *= .985;
     if (!bf.ground && !b.cd && Math.abs(hx - b.x) < 12 && hy > b.y - 6 && hy < b.y + 26) {
-      b.cd = 40; b.sw = bf.vx >= 0 ? .5 : -.5; bf.vy = -BF.J0 * BF.BELL; bf.rising = false; bf.spin = 1; bfs.bells++; bf.rang++; bf.score += 15;
+      b.cd = 40; b.sw = bf.vx >= 0 ? .5 : -.5; bf.vy = -BF.J0 * BF.BELL; bf.rising = false; bf.spin = 1; bfs.bells++; bf.rang++; bf.score += 15; if (bf.rang >= 10) bfAch('cloches');
       bf.pop = {text: 'DONG ! +15', t: 60}; bfBeep(660, .9, 'triangle', 0, .06); bfBeep(990, .6, 'sine', 0, .03);
     }
   }
   for (const nt of bf.notes) if (!nt.got && Math.abs(hx - nt.x) < 11 && Math.abs(hy - nt.y) < 15) {
-    nt.got = true; bf.got++; bfs.notes++; bf.score += 25; bfBeep([523, 587, 659, 784, 880, 1047][bf.got % 6], .18, 'triangle', 0, .05);
+    nt.got = true; bf.got++; bfs.notes++; bf.score += 25; if (bf.got >= 30) bfAch('notes'); bfBeep([523, 587, 659, 784, 880, 1047][bf.got % 6], .18, 'triangle', 0, .05);
     for (let i = 0; i < 6; i++) bf.dust.push({x: nt.x - 4 + i * 2, y: nt.y + 4 - (i % 3) * 3, t: 16, c: '#ffd84a'});
   }
   // les oiseaux (pigeons en bas, chauves-souris plus haut) traversent le clocher : les toucher coupe l'élan et le combo
@@ -467,7 +494,7 @@ function bfUpdate() {
   for (const b of bf.birds) {
     b.x += b.vx; b.y += Math.sin(bf.tick / 12 + b.ph) * .5;
     if (!bf.hurt && Math.abs(b.x - hx) < 10 && Math.abs(b.y - hy) < 12) {
-      bf.hurt = 50; bf.vx = Math.sign(b.vx) * 3; if (bf.vy < 0) bf.vy *= .3; bf.rising = false; bf.spin = 0; bfComboEnd(); bfBeep(300, .2, 'sawtooth', 120, .04);
+      bf.hurt = 50; bf.vx = Math.sign(b.vx) * 3; if (bf.vy < 0) bf.vy *= .3; bf.rising = false; bf.spin = 0; bf.birdFrom = bf.best; bfComboEnd(); bfBeep(300, .2, 'sawtooth', 120, .04);
       for (let i = 0; i < 6; i++) bf.dust.push({x: b.x - 6 + i * 2, y: b.y - 3 + (i % 2) * 6, t: 22, c: b.bat ? '#5a3a6a' : '#e0dee8'});
     }
   }
@@ -482,24 +509,25 @@ function bfUpdate() {
   if (bf.pop && --bf.pop.t <= 0) bf.pop = null;
   if (bf.banner && --bf.banner.t <= 0) bf.banner = null;
   bf.trail.unshift([bf.x, bf.y]); bf.trail.length = Math.min(bf.trail.length, 8);
-  for (const d of bf.dust) { d.t--; d.y -= .3; } bf.dust = bf.dust.filter(d => d.t > 0);
+  for (const d of bf.dust) { d.t--; if (d.vx != null) { d.x += d.vx; d.y += d.vy; d.vx *= .94; d.vy = d.vy * .94 + .05; } else d.y -= .3; } bf.dust = bf.dust.filter(d => d.t > 0);
+  if (bf.ann && --bf.ann.t <= 0) bf.ann = null; if (bf.achBan && --bf.achBan.t <= 0) bf.achBan = null; if (bf.flash) bf.flash--;
   if (bf.y - bf.cam > BF.H + 24) bfDie();
 }
 /* ---------- le dessin ---------- */
 function bfHero(g, x, y, face, st, t) {  // le sonneur, dessiné par morceaux (contour d'abord) : st = idle | run | up | down
-  const parts = [], P = (dx, dy, w, h, c) => parts.push([face ? 12 - dx - w : dx, dy, w, h, c]), Q = (dx, dy, w, h, c) => px(g, c, x + (face ? 12 - dx - w : dx), y - 18 + dy, w, h);
+  const C = (bf?.ch || BF_CH[0]).pal, parts = [], P = (dx, dy, w, h, c) => parts.push([face ? 12 - dx - w : dx, dy, w, h, c]), Q = (dx, dy, w, h, c) => px(g, c, x + (face ? 12 - dx - w : dx), y - 18 + dy, w, h);
   const ph = st === 'run' ? Math.sin(t / 3.2) : 0, air = st === 'up' || st === 'down', bob = st === 'run' ? Math.abs(Math.round(ph)) : st === 'idle' ? (t >> 5) % 2 : 0, l = Math.round(ph * 2);
   if (air) P(3, 12, 3, st === 'up' ? 4 : 5, '#3a2418'); else P(4 - l, 13, 2, 5, '#3a2418');
-  P(st === 'up' ? 2 : 3 - l, st === 'up' ? 4 : 8 + bob, 2, 4, '#24448a');
-  P(3, 7 + bob, 6, 6, '#3a6ac8');
-  P(st === 'idle' ? 0 : -1, 2 + bob + (st === 'up' ? 1 : st === 'down' ? -1 : 0), 3, 3, '#7a3a2a');
-  P(2, bob, 8, 7, '#7a3a2a');
+  P(st === 'up' ? 2 : 3 - l, st === 'up' ? 4 : 8 + bob, 2, 4, C.sleeve);
+  P(3, 7 + bob, 6, 6, C.tunic);
+  P(st === 'idle' ? 0 : -1, 2 + bob + (st === 'up' ? 1 : st === 'down' ? -1 : 0), 3, 3, C.hood);
+  P(2, bob, 8, 7, C.hood);
   if (air) P(7, st === 'up' ? 13 : 12, 3, 4, '#5a3a2a'); else P(6 + l, 13, 2, 5, '#5a3a2a');
-  P(st === 'up' ? 8 : 6 + l, st === 'up' ? 3 : 8 + bob, 2, 4, '#3a6ac8');
+  P(st === 'up' ? 8 : 6 + l, st === 'up' ? 3 : 8 + bob, 2, 4, C.tunic);
   for (const [dx, dy, w, h] of parts) px(g, '#1a1018', x + dx - 1, y - 18 + dy - 1, w + 2, h + 2);
   for (const [dx, dy, w, h, c] of parts) px(g, c, x + dx, y - 18 + dy, w, h);
-  Q(3, bob, 6, 1, '#a85a3a'); Q(2, 1 + bob, 1, 5, '#a85a3a'); Q(5, 3 + bob, 4, 3, '#ffd0a8'); Q(7, 4 + bob, 1, 1, '#1a1018'); Q(8, 5 + bob, 1, 1, '#f09a8a');
-  Q(3, 10 + bob, 6, 1, '#e0b040'); Q(8, 7 + bob, 1, 6, '#24448a');
+  Q(3, bob, 6, 1, C.hoodL); Q(2, 1 + bob, 1, 5, C.hoodL); Q(5, 3 + bob, 4, 3, '#ffd0a8'); Q(7, 4 + bob, 1, 1, '#1a1018'); Q(8, 5 + bob, 1, 1, '#f09a8a');
+  Q(3, 10 + bob, 6, 1, C.belt); Q(8, 7 + bob, 1, 6, C.sleeve);
   if (st === 'up') Q(8, 2, 2, 1, '#ffd0a8'); else if (!air) Q(6 + l, 12 + bob, 2, 1, '#ffd0a8');
 }
 function bfBell(g, cx, top, ang, t) {  // une cloche de bronze qui se balance au bout de sa corde
@@ -608,14 +636,24 @@ function bfDraw() {
   // le bandeau : étage, jauge d'élan, score, notes, combo
   px(g, '#120a0e', 0, 0, W, 20); px(g, '#3e2a30', 0, 20, W, 1);
   pxFont(g, 'Étage ' + bf.best, 5, 14, '#ffffff', 8); pxFont(g, String(bf.score), W - 5, 14, '#ffd84a', 8, 'right');
-  const sp = Math.round(Math.abs(bf.vx) / BF.VMAX * 8); for (let i = 0; i < 8; i++) px(g, i < sp ? (i < 4 ? '#7ee07a' : i < 7 ? '#ffd84a' : '#ff8a3a') : '#3a2a32', 86 + i * 6, 7, 5, 6);
+  const sp = Math.round(Math.abs(bf.vx) / (BF.VMAX * bf.ch.vmax) * 8); for (let i = 0; i < 8; i++) px(g, i < sp ? (i < 4 ? '#7ee07a' : i < 7 ? '#ffd84a' : '#ff8a3a') : '#3a2a32', 86 + i * 6, 7, 5, 6);
   if (bf.got) { sprite(g, BF_NOTE, W - 30, 25, {'#': '#ffd84a', '.': null}); pxFont(g, String(bf.got), W - 32, 34, '#ffd84a', 8, 'right'); }
-  if (bf.combo && bf.comboT) { pxFont(g, 'COMBO ' + bf.combo, W / 2, 40, '#ffd84a', 8, 'center'); px(g, '#3a2a32', W / 2 - 30, 44, 60, 2); px(g, '#ffd84a', W / 2 - 30, 44, Math.round(60 * bf.comboT / 180), 2); }
+  if (bf.flash) { g.fillStyle = 'rgba(255,240,200,' + (bf.flash / 40).toFixed(2) + ')'; g.fillRect(0, 21, W, H - 21); }
+  if (bf.ann) {  // l'annonce du combo : le mot jaillit en grand, puis se pose ; couleurs qui tournent pour les plus gros
+    const A = bf.ann, age = 130 - A.t, big = A.tier >= 4 ? 24 : 16, sz = age < 4 ? big + 16 : age < 8 ? big + 8 : big, rb = ['#ffd84a', '#ff8a3a', '#ff6ad8', '#8ad8ff', '#7ee07a'];
+    const col = A.tier >= 3 ? rb[(age >> 2) % 5] : A.tier ? '#ffd84a' : '#ffe8a0', y = 104 - Math.max(0, 8 - age) * 3;
+    g.globalAlpha = Math.min(1, A.t / 25); pxFont(g, A.word, W / 2, y, col, sz, 'center');
+    pxFont(g, A.combo + ' étages · ' + A.jumps + ' sauts', W / 2, y + 20, '#ffffff', 8, 'center'); pxFont(g, '+' + A.pts, W / 2, y + 34, '#ffd84a', 8, 'center'); g.globalAlpha = 1;
+  }
+  if (bf.achBan) { const a = Math.min(1, bf.achBan.t / 20); g.globalAlpha = a; px(g, '#120a0e', 10, H - 58, W - 20, 18); px(g, '#7ee07a', 10, H - 58, W - 20, 1); pxFont(g, bf.achBan.text, W / 2, H - 45, '#7ee07a', 8, 'center'); g.globalAlpha = 1; }
+  if (bf.combo && bf.comboT) { pxFont(g, 'COMBO ' + bf.combo, W / 2, 40, bf.combo >= 12 ? '#ff8a3a' : '#ffd84a', bf.combo >= 12 ? 16 : 8, 'center'); px(g, '#3a2a32', W / 2 - 30, 46, 60, 2); px(g, '#ffd84a', W / 2 - 30, 46, Math.round(60 * bf.comboT / 180), 2); }
   if (bf.pop) pxFont(g, bf.pop.text, W / 2, 62 - Math.round((90 - Math.min(90, bf.pop.t)) / 6), '#ff8a3a', 8, 'center');
   if (bf.banner) { const a = Math.min(1, bf.banner.t / 20, (150 - bf.banner.t) / 15); g.globalAlpha = a; gameText(g, W, [[bf.banner.text, '#ffc85a', 8]], 110); g.globalAlpha = 1; }
   if (bf.count) pxFont(g, String(Math.ceil(bf.count / 60)), W / 2, 150, '#ffd84a', 24, 'center');
   if (bf.mode === 'play' && bf.started && !bf.count && bf.y - cam > H - 60 && (t >> 3) % 2) pxFont(g, 'MONTE !', W / 2, H - 14, '#ff4a3a', 16, 'center');
-  if (bf.mode === 'ready') gameText(g, W, [['BEFFROI', '#ffc85a', 24], ['', '#ffffff'], ['← → : courir', '#ffffff'], ['Espace : sauter', '#ffffff'], ['Garde Espace pour monter plus haut', '#b8b0c8'], ['Plus tu cours vite, plus tu sautes haut', '#b8b0c8'], ['Les cloches font rebondir', '#b8b0c8'], ['Record ' + (games.best.beffroi || 0), '#ffd84a']], 90);
+  if (bf.mode === 'ready') { const ci = BF_CH.indexOf(bf.ch); gameText(g, W, [['BEFFROI', '#ffc85a', 24], ['', '#ffffff'], ['← → : courir · Espace : sauter', '#ffffff'], ['Plus tu cours vite, plus tu sautes haut', '#b8b0c8'], ['', '#ffffff'], ['< ' + bf.ch.name + ' >', '#7ee07a'], [bf.ch.what, '#b8b0c8'],
+    [(ci + 1) + ' / ' + BF_CH.length + (BF_CH.some((c, i) => !bfChOk(i)) ? '   prochain : record ' + BF_CH.find((c, i) => !bfChOk(i)).open : ''), '#8a7a99'], ['← → : personnage · Espace : partir', '#ffd84a'], ['Record ' + (games.best.beffroi || 0), '#ffd84a']], 80);
+    hg.clearRect(0, 0, hc.width, hc.height); bfHero(hg, 6, 24, 0, 'idle', t); g.drawImage(hc, W / 2 - 24, 214, 48, 60); }
   if (bf.mode === 'pause') gameText(g, W, [['PAUSE', '#ffffff', 16], ['Espace : reprendre', '#b8b0c8']], 140);
   if (bf.mode === 'over' && bf.dead > 40) gameText(g, W, [['TOMBÉ !', '#ff8a3a', 16], ['', '#ffffff'], ['Étage ' + bf.best + ' · ' + bf.score + ' points', '#ffffff'], [bf.got + ' notes · ' + bf.rang + ' cloches', '#b8b0c8'], [bf.record ? 'NOUVEAU RECORD !' : 'Record ' + (games.best.beffroi || 0), '#ffd84a'], [bf.dead > 60 ? 'Espace : recommencer' : '', '#b8b0c8']], 120);
   if (t % 30 === 0) g.canvas.setAttribute('aria-label', 'Beffroi : ' + (bf.mode === 'play' ? 'étage ' + bf.best + ', ' + bf.score + ' points' : bf.mode === 'over' ? 'partie finie à l\'étage ' + bf.best : bf.mode === 'pause' ? 'pause' : 'prêt'));
@@ -630,7 +668,12 @@ function bfPad() {
   else if (bf.mode === 'play' && s && !prev.s) { bf.mode = 'pause'; bf.keys.clear(); }
 }
 function bfInfo() {
-  $('bfStats').replaceChildren(...[['Meilleur score', games.best.beffroi || 0], ['Plus haut étage', bfs.top], ['Parties', bfs.games], ['Étages montés', bfs.floors], ['Combos', bfs.combos], ['Notes', bfs.notes], ['Cloches sonnées', bfs.bells]].flatMap(([a, b]) => [el('span', '', a), el('b', '', String(b))]));
+  $('bfStats').replaceChildren(...[['Meilleur score', games.best.beffroi || 0], ['Plus haut étage', bfs.top], ['Parties', bfs.games], ['Étages montés', bfs.floors], ['Combos', bfs.combos], ['Plus gros combo', bfs.bestCombo + ' étages'], ['Notes', bfs.notes], ['Cloches sonnées', bfs.bells]].flatMap(([a, b]) => [el('span', '', a), el('b', '', String(b))]));
+  $('bfAch').replaceChildren(...BF_ACH.flatMap(([id, n, what]) => [el('span', '', (bfs.ach[id] ? '✓ ' : '· ') + n), el('b', '', what)]));
+}
+function bfPick(d) {  // le personnage suivant parmi ceux qui sont ouverts
+  let i = BF_CH.indexOf(bf.ch); for (let k = 0; k < BF_CH.length; k++) { i = (i + d + BF_CH.length) % BF_CH.length; if (bfChOk(i)) break; }
+  bf.ch = BF_CH[i]; bfs.ch = i; saveGames(); bfBeep(500 + i * 120, .06, 'triangle');
 }
 function bfStart() {
   if (bf.mode === 'ready' || bf.mode === 'pause') { bf.mode = 'play'; return true; }
@@ -641,6 +684,7 @@ const BF_KEYS = ['ArrowUp', 'ArrowLeft', 'ArrowRight', 'z', 'q', 'd', 'w', 'a', 
 document.addEventListener('keydown', e => {
   if (!view.classList.contains('on') || !bf || /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
   const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  if (bf.mode === 'ready' && ['ArrowLeft', 'ArrowRight', 'q', 'a', 'd'].includes(k)) { e.preventDefault(); if (!e.repeat) bfPick(k === 'ArrowLeft' || k === 'q' || k === 'a' ? -1 : 1); return; }
   if (BF_KEYS.includes(k) || k === 'Enter') { e.preventDefault(); if (bf.mode !== 'play') { if (!e.repeat && (k === ' ' || k === 'Enter' || bf.mode === 'ready')) bfStart(); if (k === ' ' || k === 'Enter') return; } if (k !== 'Enter') bf.keys.add(k); }
   if ((k === 'p' || k === 'Escape') && bf.mode === 'play') { bf.mode = 'pause'; bf.keys.clear(); }
 });
@@ -653,20 +697,23 @@ $('bfNew').onclick = () => { bfNew(); $('bfNew').blur(); };
 $('bfFs').onclick = () => { $('bfCanvas').parentElement.requestFullscreen?.().catch(() => {}); $('bfFs').blur(); };
 {  // vérification : un saut sur place passe un étage, un saut lancé à fond au moins 3 ; on se pose en descendant ; lâcher la touche raccourcit le saut ;
    // on peut encore sauter juste après avoir quitté une poutre ; une cloche relance vers le haut
-  const keep = bf; bf = null; bfNew();
+  const keep = bf, kch = bfs.ch, kach = bfs.ach, kbc = bfs.bestCombo, kcb = bfs.combos, kbeep = bfBeep; bfBeep = () => {}; setTimeout(() => { bfBeep = kbeep; }, 1500); bfs.ch = 0; bf = null; bfNew();
   const h = v => (BF.J0 + v * BF.JV) ** 2 / (2 * BF.G);
   const jump = hold => { bfNew(); bf.mode = 'play'; bf.x = 60; bf.y = 0; bf.ground = bf.floors[0]; bf.cam = -250; bf.vx = 0; bf.keys.add(' '); bfUpdate(); if (!hold) bf.keys.clear(); let n = 0, up = 0; while (n++ < 200) { bfUpdate(); up = Math.max(up, -bf.y); if (bf.ground) break; } bf.keys.clear(); return {up, land: bf.ground?.n}; };
   const full = jump(true), tap = jump(false);
   bfNew(); bf.mode = 'play'; bf.ground = null; bf.coy = 3; bf.y = -5; bf.vy = 0; bf.keys.add(' '); bfUpdate(); const coyote = bf.vy < 0; bf.keys.clear();
   bfNew(); bf.mode = 'play'; bf.ground = null; bf.y = -100; bf.vy = 2; bf.x = 100; bf.bells = [{x: 106, y: -112, cd: 0, sw: 0, n: 2}]; bfUpdate(); const bell = bf.vy < -BF.J0;
-  const ok = h(0) > BF.FL + 4 && h(BF.VMAX) > 3 * BF.FL && full.land === 1 && full.up > BF.FL && tap.up < full.up - 10 && coyote && bell;
+  bfNew(); bf.mode = 'play'; bf.ch = BF_CH[2]; bf.ground = null; bf.coy = 0; bf.y = -60; bf.vy = 3; bf.jPrev = false; bf.keys.add(' '); bfUpdate(); const dbl = bf.vy < 0 && bf.dbl; bf.keys.clear(); bf.jPrev = false; bf.vy = 3; bf.keys.add(' '); bfUpdate(); const once = bf.vy > 0; bf.keys.clear();
+  bfNew(); bf.mode = 'play'; bf.combo = 33; bf.comboN = 4; bfComboEnd(); const word = bf.ann?.word === 'INCROYABLE !' && bf.ann.pts === 1089; bfs.ach = {}; bf.combo = 52; bf.comboN = 3; bfComboEnd(); const ach = !!bfs.ach.combo && bf.ann.word === 'FABULEUX !';
+  bfs.ch = kch; bfs.ach = kach; bfs.bestCombo = kbc; bfs.combos = kcb;
+  const ok = h(0) > BF.FL + 4 && h(BF.VMAX) > 3 * BF.FL && full.land === 1 && full.up > BF.FL && tap.up < full.up - 10 && coyote && bell && dbl && once && word && ach;
   console.assert(ok, 'beffroi', {h0: h(0), hmax: h(BF.VMAX), full, tap, coyote, bell});
-  view.dataset.selfcheck = ok ? 'ok' : JSON.stringify({full, tap, coyote, bell});
+  view.dataset.selfcheck = ok ? 'ok' : JSON.stringify({full, tap, coyote, bell, dbl, once, word, ach});
   bf = keep;
 }
 ctx.onOpen(() => {
   if (!bf || !bf.g) { bfNew(); bf.g = $('bfCanvas').getContext('2d'); bf.hc = el('canvas'); bf.hc.width = 24; bf.hc.height = 30; }
-  $('bfCanvas').__bf = {st: () => bf, s: () => bfs, gen: bfGen, upd: bfUpdate,
+  $('bfCanvas').__bf = {st: () => bf, s: () => bfs, gen: bfGen, upd: bfUpdate, comboEnd: bfComboEnd, pick: bfPick,
     warp: n => { bfGen(n + 40); const f = bf.floors[n]; bf.mode = 'play'; bf.x = f.x + f.w / 2 - 6; bf.y = bfFloorY(n); bf.vy = 0; bf.vx = 0; bf.ground = f; bf.last = n; bf.best = Math.max(bf.best, n); bf.cam = bf.y - BF.H * .55; bf.zi = bfZi(n); bf.started = n >= 5; bf.count = 0; return 0; }};
   gameLoop(bf, 'beffroi', bfUpdate, bfDraw); bfInfo();
 });
