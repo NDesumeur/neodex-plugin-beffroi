@@ -1,7 +1,7 @@
 {
   "id": "neodex.beffroi",
   "name": "Beffroi",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "author": "NDesumeur",
   "description": "Jeu de saut en pixel art : monte les étages d'un clocher en courant et en sautant. Plus tu cours vite et plus tu gardes la touche, plus tu sautes haut, et les murs te renvoient l'élan. Le clocher change en montant (caves, charpente, salle des cloches, horloge, vitraux, sommet sous les étoiles) ; des cloches pour rebondir, des notes à ramasser, des oiseaux qui gênent, des poutres qui bougent, cassent ou glissent. Dès le 5e étage, il défile de plus en plus vite. Combos, record, manette et plein écran. Nouveau : les gros combos annoncés en grand (de BIEN à LÉGENDAIRE, avec étincelles et arpège), trois personnages aux sauts différents (le sonneur, la funambule, l'acrobate et son second saut) et six succès de figure.",
   "icon": "icon.png",
@@ -22,5 +22,83 @@
   "sdk": "2.1.0",
   "permissions": [
     "storage"
+  ],
+  "succes": [
+    {
+      "id": "premier",
+      "nom": "Premiers étages",
+      "texte": "Finir une première partie"
+    },
+    {
+      "id": "etage25",
+      "nom": "Le clocher",
+      "texte": "Atteindre l'étage 25"
+    },
+    {
+      "id": "etage50",
+      "nom": "À mi-hauteur",
+      "texte": "Atteindre l'étage 50"
+    },
+    {
+      "id": "sommet",
+      "nom": "Le sommet",
+      "texte": "Atteindre l'étage 100"
+    },
+    {
+      "id": "murs",
+      "nom": "Sans les murs",
+      "texte": "100 étages sans toucher un mur"
+    },
+    {
+      "id": "combo",
+      "nom": "Grand combo",
+      "texte": "Un combo de 50 étages"
+    },
+    {
+      "id": "cloches",
+      "nom": "Carillon",
+      "texte": "10 cloches dans une partie"
+    },
+    {
+      "id": "notes",
+      "nom": "Mélomane",
+      "texte": "30 notes dans une partie"
+    },
+    {
+      "id": "oiseaux",
+      "nom": "Ciel dégagé",
+      "texte": "80 étages sans toucher un oiseau"
+    },
+    {
+      "id": "mille",
+      "nom": "Mille marches",
+      "texte": "Monter 1 000 étages en tout"
+    },
+    {
+      "id": "combo20",
+      "nom": "Bel enchaînement",
+      "texte": "Un combo de 20 étages"
+    }
+  ],
+  "records": [
+    {
+      "id": "score",
+      "nom": "Meilleur score",
+      "sens": "haut",
+      "format": "nombre"
+    },
+    {
+      "id": "etage",
+      "nom": "Étage le plus haut",
+      "sens": "haut",
+      "format": "nombre"
+    },
+    {
+      "id": "combo",
+      "nom": "Plus grand combo",
+      "sens": "haut",
+      "format": "nombre",
+      "unite": "étages"
+    }
   ]
 }

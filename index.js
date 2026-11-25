@@ -305,6 +305,9 @@ export default async function (ctx) {
   const best = (k, v) => { const b = games.best[k]; if (v > (b ?? 0)) {  // un score nul n'est jamais un record
     games.best[k] = v; saveGames(); return true; } return false; };
   const gstore = (k, init) => (games[k] ??= init);
+  // les trophées de NeoDex (3.4.8 et plus) : succès et records déclarés dans plugin.json ; sur un NeoDex plus ancien, rien ne se passe
+  const trophy = (id, quiet) => { ctx.games?.unlock(id, quiet).catch(() => {}); };  // quiet : sans message de NeoDex (le jeu montre déjà le sien)
+  const trophyRecord = (id, v) => { if (v != null && Number.isFinite(+v)) ctx.games?.record(id, +v).catch(() => {}); };
 function gameLoop(st, appKey, update, draw) {
   cancelAnimationFrame(st.raf);
   const STEP = 1000 / 60; let acc = 0, last = performance.now();
@@ -668,6 +671,7 @@ function bfPad() {
   else if (bf.mode === 'play' && s && !prev.s) { bf.mode = 'pause'; bf.keys.clear(); }
 }
 function bfInfo() {
+  setTimeout(bfTrophies);
   $('bfStats').replaceChildren(...[['Meilleur score', games.best.beffroi || 0], ['Plus haut étage', bfs.top], ['Parties', bfs.games], ['Étages montés', bfs.floors], ['Combos', bfs.combos], ['Plus gros combo', bfs.bestCombo + ' étages'], ['Notes', bfs.notes], ['Cloches sonnées', bfs.bells]].flatMap(([a, b]) => [el('span', '', a), el('b', '', String(b))]));
   $('bfAch').replaceChildren(...BF_ACH.flatMap(([id, n, what]) => [el('span', '', (bfs.ach[id] ? '✓ ' : '· ') + n), el('b', '', what)]));
 }
@@ -710,6 +714,14 @@ $('bfFs').onclick = () => { $('bfCanvas').parentElement.requestFullscreen?.().ca
   console.assert(ok, 'beffroi', {h0: h(0), hmax: h(BF.VMAX), full, tap, coyote, bell});
   view.dataset.selfcheck = ok ? 'ok' : JSON.stringify({full, tap, coyote, bell, dbl, once, word, ach});
   bf = keep;
+}
+// les trophées, tirés des statistiques et des records gardés (aussi à l'ouverture : ce qui a été fait avant compte)
+function bfTrophies() {  // les 6 succès du jeu repris sans second message (le jeu a déjà son bandeau), et quelques-uns de plus
+  const sig = [bfs.games, bfs.top, bfs.floors, bfs.bestCombo, Object.keys(bfs.ach).length, games.best.beffroi].join(); if (sig === bfTrophies.sig) return; bfTrophies.sig = sig;
+  trophyRecord('score', games.best.beffroi); trophyRecord('etage', bfs.top || null); trophyRecord('combo', bfs.bestCombo || null);
+  for (const id of ['murs', 'combo', 'cloches', 'notes', 'sommet', 'oiseaux']) if (bfs.ach[id]) trophy(id, true);
+  if (bfs.games >= 1) trophy('premier'); if (bfs.top >= 25) trophy('etage25'); if (bfs.top >= 50) trophy('etage50');
+  if (bfs.floors >= 1000) trophy('mille'); if (bfs.bestCombo >= 20) trophy('combo20');
 }
 ctx.onOpen(() => {
   if (!bf || !bf.g) { bfNew(); bf.g = $('bfCanvas').getContext('2d'); bf.hc = el('canvas'); bf.hc.width = 24; bf.hc.height = 30; }

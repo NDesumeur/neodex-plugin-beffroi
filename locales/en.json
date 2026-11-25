@@ -146,5 +146,19 @@
  "← → : courir · Espace : sauter": "← →: run · Space: jump",
  "prochain : record": "next: record",
  "← → : personnage · Espace : partir": "← →: character · Space: start",
- "Jeu de saut en pixel art : monte les étages d'un clocher en courant et en sautant. Plus tu cours vite et plus tu gardes la touche, plus tu sautes haut, et les murs te renvoient l'élan. Le clocher change en montant (caves, charpente, salle des cloches, horloge, vitraux, sommet sous les étoiles) ; des cloches pour rebondir, des notes à ramasser, des oiseaux qui gênent, des poutres qui bougent, cassent ou glissent. Dès le 5e étage, il défile de plus en plus vite. Combos, record, manette et plein écran. Nouveau : les gros combos annoncés en grand (de BIEN à LÉGENDAIRE, avec étincelles et arpège), trois personnages aux sauts différents (le sonneur, la funambule, l'acrobate et son second saut) et six succès de figure.": "A pixel art jumping game: climb the floors of a bell tower by running and jumping. The faster you run and the longer you hold the key, the higher you jump, and the walls send your momentum back. The tower changes as you climb (cellars, timber frame, bell room, clock, stained glass, the top under the stars); bells to bounce on, notes to collect, birds in the way, beams that move, break or slide. From the 5th floor, it scrolls faster and faster. Combos, record, gamepad and fullscreen. New: big combos announced in large letters (from NICE to LEGENDARY, with sparks and an arpeggio), three characters with different jumps (the bell-ringer, the tightrope walker, the acrobat and their second jump) and six trick achievements."
+ "Jeu de saut en pixel art : monte les étages d'un clocher en courant et en sautant. Plus tu cours vite et plus tu gardes la touche, plus tu sautes haut, et les murs te renvoient l'élan. Le clocher change en montant (caves, charpente, salle des cloches, horloge, vitraux, sommet sous les étoiles) ; des cloches pour rebondir, des notes à ramasser, des oiseaux qui gênent, des poutres qui bougent, cassent ou glissent. Dès le 5e étage, il défile de plus en plus vite. Combos, record, manette et plein écran. Nouveau : les gros combos annoncés en grand (de BIEN à LÉGENDAIRE, avec étincelles et arpège), trois personnages aux sauts différents (le sonneur, la funambule, l'acrobate et son second saut) et six succès de figure.": "A pixel art jumping game: climb the floors of a bell tower by running and jumping. The faster you run and the longer you hold the key, the higher you jump, and the walls send your momentum back. The tower changes as you climb (cellars, timber frame, bell room, clock, stained glass, the top under the stars); bells to bounce on, notes to collect, birds in the way, beams that move, break or slide. From the 5th floor, it scrolls faster and faster. Combos, record, gamepad and fullscreen. New: big combos announced in large letters (from NICE to LEGENDARY, with sparks and an arpeggio), three characters with different jumps (the bell-ringer, the tightrope walker, the acrobat and their second jump) and six trick achievements.",
+ "Premiers étages": "First floors",
+ "Finir une première partie": "Finish your first game",
+ "Le clocher": "The bell tower",
+ "Atteindre l'étage 25": "Reach floor 25",
+ "À mi-hauteur": "Halfway up",
+ "Atteindre l'étage 50": "Reach floor 50",
+ "Atteindre l'étage 100": "Reach floor 100",
+ "Un combo de 50 étages": "A 50-floor combo",
+ "Mille marches": "A thousand steps",
+ "Monter 1 000 étages en tout": "Climb 1,000 floors in total",
+ "Bel enchaînement": "Nice chain",
+ "Un combo de 20 étages": "A 20-floor combo",
+ "Étage le plus haut": "Highest floor",
+ "Plus grand combo": "Biggest combo"
 }
